@@ -2,22 +2,64 @@ import os, json, html, datetime, secrets
 from PIL import Image, ImageDraw, ImageFont
 D="https://tinydesktrend.com"; OUT="public"; TODAY="2026-10-28"
 os.makedirs(OUT,exist_ok=True)
-NAV='<nav><a href="/">Tiny Desk AI</a> <a href="/guides/">Guides</a> <a href="/faq/">FAQ</a></nav>'
+NAV="""<header class="site-header"><div class="wrap hdr">
+<a class="logo" href="/" aria-label="Tiny Desk Trend home"><span class="logo-mark" aria-hidden="true">TD</span><span>Tiny Desk AI</span></a>
+<nav class="main-nav" id="main-nav" aria-label="Main"><a href="/#create">Create</a><a href="/#pricing">Pricing</a><a href="/#how-it-works">How it works</a><a href="/guides/">Guides</a><a href="/#faq">FAQ</a></nav>
+<div class="hdr-right">
+ <div class="auth-out" id="hdr-out"><button type="button" class="btn ghost sm" data-auth="login">Sign in</button><button type="button" class="btn sm hide-xs" data-auth="signup">Sign up</button></div>
+ <div class="auth-in" id="hdr-in" hidden><a class="credit-pill" href="/#pricing" title="Your credits"><b id="hdr-credits">0</b> credits</a>
+  <div class="acct"><button type="button" class="acct-btn" id="acct-btn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu"><span id="acct-initial">?</span></button>
+   <div class="acct-menu" id="acct-menu" hidden><p class="acct-email" id="hdr-email"></p><a href="/#videos" data-menu="videos">My videos</a><a href="/#pricing">Buy credits</a><button type="button" id="hdr-logout">Sign out</button></div></div></div>
+ <button type="button" class="burger" id="burger" aria-label="Menu" aria-controls="main-nav" aria-expanded="false"><span></span><span></span><span></span></button>
+</div></div></header>
+<dialog class="modal" id="auth-modal" aria-labelledby="auth-title"><form method="dialog" class="modal-x"><button aria-label="Close">×</button></form>
+<h2 id="auth-title">Sign in</h2><p class="muted small" id="auth-sub">Use your email and a password. No email verification needed.</p>
+<div class="tabs" role="tablist"><button type="button" role="tab" data-tab="login" class="on">Sign in</button><button type="button" role="tab" data-tab="signup">Create account</button></div>
+<form id="auth-form" class="auth-form"><label>Email <input id="email" type="email" autocomplete="email" required></label>
+<label>Password <span class="muted small">(8+ characters)</span> <input id="password" type="password" autocomplete="current-password" minlength="8" required></label>
+<button type="submit" class="btn full" id="auth-submit">Sign in</button><p id="auth-msg" class="msg small"></p>
+<p class="small muted">By continuing you agree to the <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy Policy</a>.</p></form></dialog>"""
 DISC='<p class="disc"><strong>Unofficial fan tool.</strong> Tiny Desk Trend is not affiliated with, endorsed by, or connected to NPR, NPR Music, or Tiny Desk Concerts. No NPR or Tiny Desk logos or official assets are used on this site.</p>'
-FOOT=f'<footer>{DISC}<p><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/guides/">Guides</a> · <a href="/faq/">FAQ</a></p><p>© 2026 tinydesktrend.com</p></footer>'
-CSS="""body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:760px;margin:0 auto;padding:16px 20px;line-height:1.6;color:#1f1b16;background:#fbf7f0}nav a{margin-right:14px;font-weight:600;color:#7a3e12;text-decoration:none}h1{font-size:2rem;line-height:1.2}h2{margin-top:2rem}.disc{background:#fff3d6;border:1px solid #e8c77a;padding:10px 14px;border-radius:8px;font-size:.95rem}.soon{border:2px dashed #b07a3a;border-radius:12px;padding:20px;text-align:center;background:#fff}.soon b{font-size:1.3rem}footer{margin-top:3rem;border-top:1px solid #ddd;padding-top:1rem;font-size:.9rem}a{color:#7a3e12}table{border-collapse:collapse}.home{max-width:1100px}.hero{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:28px;align-items:start}.hero-side video{width:100%;max-width:360px;border-radius:14px;background:#000;display:block}.lead{font-size:1.1rem}.card{background:#fff;border:1px solid #e3d6c3;border-radius:14px;padding:18px}.card h2{font-size:1.1rem;margin:.8rem 0 .4rem}.card label{display:block;margin:.4rem 0}.card input[type=email],.card input[type=password]{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:.5rem 0}.btn{background:#b0652a;color:#fff;border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}.btn.ghost{background:#fff;color:#7a3e12;border:1px solid #b0652a}.btn.big{font-size:1.05rem;padding:12px 20px;margin-top:.5rem}.btn:disabled{opacity:.45;cursor:not-allowed}.link{background:none;border:0;color:#7a3e12;text-decoration:underline;cursor:pointer;padding:0;font:inherit}#preview{max-width:160px;max-height:160px;border-radius:8px;display:block;margin:.5rem 0}#result video{width:100%;max-width:320px;border-radius:10px;background:#000}.consent{font-size:.95rem}.msg{min-height:1.2em}.msg.error{color:#a3201b}.msg.ok{color:#1d6b2f}.small{font-size:.9rem}.muted{color:#6b5e50}.packs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.pack{border:2px solid #e3d6c3;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px;background:#fff;cursor:pointer}.pack:has(input:checked){border-color:#b0652a}.price{font-size:1.6rem;font-weight:800}.steps li{margin:.5rem 0}details{border-bottom:1px solid #e3d6c3;padding:.6rem 0}summary{font-weight:600;cursor:pointer}.cta{text-align:center;padding:2rem 0}@media(max-width:760px){.hero,.packs{grid-template-columns:1fr}}td,th{border:1px solid #ccc;padding:4px 8px}"""
+FOOT=f"""<footer class="site-footer"><div class="wrap">
+<div class="foot-grid"><div><a class="logo" href="/"><span class="logo-mark" aria-hidden="true">TD</span><span>Tiny Desk AI</span></a><p class="small">An unofficial photo-to-video tool for the "Outstanding" Tiny Desk AI trend.</p></div>
+<div><h3>Product</h3><a href="/#create">Create a video</a><a href="/#pricing">Pricing</a><a href="/#how-it-works">How it works</a><a href="/faq/">FAQ</a></div>
+<div><h3>Guides</h3><a href="/guides/what-is-the-tiny-desk-ai-trend/">Trend origin</a><a href="/guides/outstanding-tiny-desk-song/">The song</a><a href="/guides/outstanding-tiny-desk-ai-template/">The template</a><a href="/guides/">All guides</a></div>
+<div><h3>Legal</h3><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="mailto:privacy@tinydesktrend.com">Contact</a></div></div>
+{DISC}<p class="small">© 2026 tinydesktrend.com</p></div></footer>"""
+CSS="""*{box-sizing:border-box}html{scroll-padding-top:76px}.msg:empty{min-height:0;margin:0}.meta{margin:12px 0 0;font-size:.85rem;color:#6b5e50}body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;line-height:1.6;color:#1f1b16;background:#fbf7f0}a{color:#8a4614}img,video{max-width:100%}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}.wrap.narrow{max-width:780px}.prose main{padding-top:24px;padding-bottom:24px}h1{font-size:2.1rem;line-height:1.15;margin:.3rem 0 .6rem}h2{font-size:1.7rem;line-height:1.2;margin:0 0 .6rem}.prose h2{font-size:1.35rem;margin-top:2rem}.center{text-align:center}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.75rem;font-weight:700;color:#8a4614;margin:0 0 .3rem}
+.site-header{position:sticky;top:0;z-index:50;background:rgba(251,247,240,.94);backdrop-filter:blur(8px);border-bottom:1px solid #eadfce}.hdr{display:flex;align-items:center;gap:16px;height:64px}.logo{display:flex;align-items:center;gap:8px;font-weight:800;color:#1f1b16;text-decoration:none;white-space:nowrap}.logo-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:#b0652a;color:#fff;font-size:.8rem}
+.main-nav{flex:1;display:flex;justify-content:center;gap:26px}.main-nav a{color:#3b3229;text-decoration:none;font-size:.95rem;font-weight:500}.main-nav a:hover{color:#8a4614}.hdr-right{display:flex;align-items:center;gap:8px}.auth-out,.auth-in{display:flex;align-items:center;gap:8px}[hidden]{display:none!important}
+.credit-pill{border:1px solid #e3d6c3;background:#fff;border-radius:999px;padding:5px 12px;font-size:.88rem;color:#1f1b16;text-decoration:none;white-space:nowrap}.acct{position:relative}.acct-btn{width:36px;height:36px;border-radius:50%;border:0;background:#1f1b16;color:#fff;font-weight:700;cursor:pointer;text-transform:uppercase}.acct-menu{position:absolute;right:0;top:44px;background:#fff;border:1px solid #e3d6c3;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);min-width:220px;padding:6px;display:flex;flex-direction:column}.acct-menu a,.acct-menu button{padding:9px 12px;border-radius:8px;text-align:left;background:none;border:0;font:inherit;color:#1f1b16;text-decoration:none;cursor:pointer}.acct-menu a:hover,.acct-menu button:hover{background:#f5ede1}.acct-email{margin:0;padding:8px 12px;font-size:.85rem;color:#6b5e50;border-bottom:1px solid #eee;overflow:hidden;text-overflow:ellipsis}
+.burger{display:none;width:40px;height:40px;border:1px solid #e3d6c3;border-radius:10px;background:#fff;flex-direction:column;justify-content:center;align-items:center;gap:4px;cursor:pointer}.burger span{display:block;width:18px;height:2px;background:#1f1b16}
+.btn{background:#b0652a;color:#fff;border:1px solid #b0652a;border-radius:10px;padding:10px 16px;font-weight:700;font-size:.95rem;cursor:pointer;text-decoration:none;display:inline-block;text-align:center;font-family:inherit}.btn:hover{background:#97531f}.btn.ghost{background:#fff;color:#8a4614}.btn.ghost:hover{background:#f5ede1}.btn.sm{padding:7px 14px;font-size:.88rem}.btn.big{font-size:1.05rem;padding:13px 22px}.btn.full{width:100%}.btn:disabled{opacity:.45;cursor:not-allowed}.link{background:none;border:0;color:#8a4614;text-decoration:underline;cursor:pointer;padding:0;font:inherit}
+.hero{padding:36px 0 48px}.hero-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.85fr);gap:40px;align-items:start}.lead{font-size:1.08rem;color:#3b3229;margin:0 0 18px}.hero-side video{width:100%;max-width:380px;aspect-ratio:9/16;object-fit:cover;border-radius:16px;background:#000;display:block;margin:0 auto;box-shadow:0 12px 40px rgba(0,0,0,.18)}
+.card{background:#fff;border:1px solid #e3d6c3;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.04)}.drop{display:flex;align-items:center;gap:14px;border:2px dashed #d6bf9f;border-radius:12px;padding:16px;cursor:pointer;background:#fffaf3;min-height:96px}.drop:hover{border-color:#b0652a}.drop-text{display:flex;flex-direction:column}.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}#preview{width:72px;height:72px;object-fit:cover;border-radius:10px}.consent{display:flex;gap:8px;align-items:flex-start;font-size:.92rem;margin:12px 0}.consent input{margin-top:5px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:.6rem 0}#result video{width:100%;max-width:300px;border-radius:12px;background:#000;display:block;margin-top:8px}.msg{min-height:1.2em;margin:.4rem 0}.msg.error{color:#a3201b}.msg.ok{color:#1d6b2f}.small{font-size:.88rem}.muted{color:#6b5e50}.history{margin-top:10px;border-top:1px solid #eee;padding-top:8px}.history ul{margin:.4rem 0;padding-left:1.1rem;font-size:.9rem}
+section{padding:56px 0}.band{background:#f3eadc}.packs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:920px;margin:28px auto 0}.pack{position:relative;background:#fff;border:1px solid #e3d6c3;border-radius:16px;padding:24px;display:flex;flex-direction:column}.pack h3{margin:0;font-size:1.05rem}.pack p{margin:.2rem 0}.pack ul{padding-left:1.1rem;margin:.8rem 0 1.2rem;flex:1;color:#3b3229}.pack.pop{border:2px solid #b0652a;box-shadow:0 10px 30px rgba(176,101,42,.15)}.badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#b0652a;color:#fff;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}.price{font-size:2rem;font-weight:800}
+.steps{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s;margin:24px 0}.steps li{counter-increment:s;background:#fff;border:1px solid #e3d6c3;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:6px}.steps li::before{content:counter(s);display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#1f1b16;color:#fff;font-weight:700}.steps span{color:#3b3229;font-size:.95rem}
+.guide-list{columns:2;padding-left:1.1rem}.faq-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr);gap:40px}details{border-bottom:1px solid #e3d6c3;padding:.8rem 0}summary{font-weight:600;cursor:pointer}details p{margin:.5rem 0 0;color:#3b3229}
+.cta{background:#1f1b16;color:#fff;text-align:center}.cta p{color:#d9cdbd}
+.site-footer{background:#15110d;color:#cfc3b3;padding:44px 0 24px;font-size:.92rem}.site-footer a{color:#e9dccb;text-decoration:none}.site-footer a:hover{text-decoration:underline}.site-footer .logo{color:#fff}.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:24px;margin-bottom:20px}.foot-grid h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:#fff;margin:0 0 .6rem}.foot-grid div>a:not(.logo){display:block;margin:.3rem 0}.site-footer .disc{background:transparent;border:1px solid #3a3129;color:#cfc3b3}
+.disc{background:#fff3d6;border:1px solid #e8c77a;padding:10px 14px;border-radius:10px;font-size:.9rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px}
+.modal{border:0;border-radius:16px;padding:24px;width:min(420px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.3)}.modal::backdrop{background:rgba(20,15,10,.55)}.modal h2{margin:0 0 .2rem;font-size:1.4rem}.modal-x{position:absolute;right:12px;top:8px}.modal-x button{background:none;border:0;font-size:1.6rem;cursor:pointer;color:#6b5e50}.tabs{display:flex;background:#f3eadc;border-radius:10px;padding:4px;margin:12px 0}.tabs button{flex:1;border:0;background:none;padding:8px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;color:#6b5e50}.tabs button.on{background:#fff;color:#1f1b16;box-shadow:0 1px 3px rgba(0,0,0,.1)}.auth-form label{display:block;margin:.5rem 0;font-size:.92rem;font-weight:600}.auth-form input{width:100%;padding:10px;border:1px solid #d6c9b6;border-radius:10px;font:inherit;margin-top:4px}.auth-form .btn{margin-top:10px}
+@media(max-width:900px){.main-nav{display:none;position:absolute;top:64px;left:0;right:0;background:#fbf7f0;flex-direction:column;gap:0;padding:8px 20px 16px;border-bottom:1px solid #eadfce}.main-nav.open{display:flex}.main-nav a{padding:10px 0;border-bottom:1px solid #f0e6d8}.burger{display:flex}.hdr{justify-content:space-between}.hdr-right{margin-left:auto}}
+@media(max-width:760px){h1{font-size:1.7rem}h2{font-size:1.4rem}.hero{padding:20px 0 32px}.hero-grid,.packs,.steps,.faq-grid{grid-template-columns:1fr}.hero-side video{max-width:260px}.packs{gap:22px}.foot-grid{grid-template-columns:1fr 1fr}.guide-list{columns:1}section{padding:40px 0}.hide-xs{display:none}.credit-pill{padding:4px 9px;font-size:.8rem}}
+"""
 open(f"{OUT}/style.css","w").write(CSS)
 pages=[]
-def page(path,title,desc,body,ld=None,extra_head="",cls=""):
+def page(path,title,desc,body,ld=None,extra_head="",cls="",index=True):
     url=D+path
+    rob="" if index else '<meta name="robots" content="noindex">'; bcls=cls or "prose"; mcls="" if cls else "wrap narrow"
     lds="".join(f'<script type="application/ld+json">{json.dumps(x)}</script>' for x in (ld or []))
     h=f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{html.escape(title)}</title><meta name="description" content="{html.escape(desc)}"><link rel="canonical" href="{url}">
+<title>{html.escape(title)}</title><meta name="description" content="{html.escape(desc)}"><link rel="canonical" href="{url}">{rob}
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Tiny Desk Trend"><meta property="og:title" content="{html.escape(title)}"><meta property="og:description" content="{html.escape(desc)}"><meta property="og:url" content="{url}"><meta property="og:image" content="{D}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{html.escape(title)}"><meta name="twitter:description" content="{html.escape(desc)}"><meta name="twitter:image" content="{D}/og.png">{lds}{extra_head}</head>
-<body class="{cls}">{NAV}<main>{body}</main>{FOOT}</body></html>"""
-    d=OUT+path; os.makedirs(d,exist_ok=True); open(d+"index.html","w").write(h); pages.append(path)
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{html.escape(title)}"><meta name="twitter:description" content="{html.escape(desc)}"><meta name="twitter:image" content="{D}/og.png">{lds}<script type="module" src="/site.js"></script>{extra_head}</head>
+<body class="{bcls}">{NAV}<main class="{mcls}">{body}</main>{FOOT}</body></html>"""
+    d=OUT+path; os.makedirs(d,exist_ok=True); open(d+"index.html","w").write(h)
+    if index: pages.append(path)
 
 SRC_NPR="https://www.npr.org/2023/06/05/1179416602/charlie-wilson-tiny-desk-concert"
 SRC_RS="https://www.rollingstone.com/music/music-news/charlie-wilson-gap-band-tiny-desk-1234759558/"
@@ -40,56 +82,54 @@ faq_ld={"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type"
 web_ld={"@context":"https://schema.org","@type":"WebSite","name":"Tiny Desk Trend","url":D+"/"}
 GUIDES_LIST=[("/guides/what-is-the-tiny-desk-ai-trend/","Where the Tiny Desk AI trend came from"),("/guides/how-to-make-outstanding-tiny-desk-ai-video/","How the Outstanding Tiny Desk AI video is made"),("/guides/outstanding-tiny-desk-song/","What is the song?"),("/guides/tiny-desk-ai-video-generator/","Tiny Desk AI video generator: what to check"),("/guides/outstanding-tiny-desk-ai-template/","The Outstanding template: shots and roles"),("/guides/outstanding-tiny-desk-meme-ideas/","Meme meaning and casting ideas"),("/guides/outstanding-gap-band-song-facts/","\"Outstanding\" by The Gap Band: facts")]
 HOME=f"""
-<section class="hero" id="create">
+<section class="hero" id="create"><div class="wrap hero-grid">
  <div class="hero-main">
-  <h1>Tiny Desk AI: put your face in the "Outstanding" Tiny Desk video</h1>
-  <p class="lead">Upload one photo and get the 13-second lead-singer clip of the Outstanding Tiny Desk AI trend, recast with you. Vertical 9:16, with the song and a silent copy.</p>
+  <p class="eyebrow">Unofficial Tiny Desk AI video generator</p>
+  <h1>Put your face in the "Outstanding" Tiny Desk video</h1>
+  <p class="lead">Upload one photo and get the 13-second lead-singer clip, recast with you. Vertical 9:16, with the song and a silent copy.</p>
   <div class="card gen" id="account">
-   <div id="auth-forms" hidden>
-    <h2>1. Create a free account or log in</h2>
-    <label>Email <input id="email" type="email" autocomplete="email" required></label>
-    <label>Password (8+ characters) <input id="password" type="password" autocomplete="current-password" minlength="8" required></label>
-    <div class="row"><button type="button" id="signup" class="btn">Create account</button><button type="button" id="login" class="btn ghost">Log in</button></div>
-    <p id="auth-msg" class="msg"></p>
-   </div>
-   <div id="signed-in" hidden><p class="small">Signed in as <b id="who"></b> · <b id="credits">0</b> credits · <button type="button" id="logout" class="link">Log out</button></p></div>
-   <h2>2. Add your photo</h2>
-   <input id="photo" type="file" accept="image/jpeg,image/png,image/webp">
-   <img id="preview" alt="Your photo preview" hidden>
-   <p id="photo-msg" class="msg small">JPEG, PNG or WebP, up to 10 MB. One clear, front-facing face.</p>
+   <label class="drop" id="drop"><input id="photo" class="vh" type="file" accept="image/jpeg,image/png,image/webp">
+    <img id="preview" alt="Your photo preview" hidden>
+    <span class="drop-text" id="drop-text"><b>Choose a photo</b><span class="small muted">JPEG, PNG or WebP, up to 10 MB. One clear, front-facing face.</span></span></label>
+   <p id="photo-msg" class="msg small"></p>
    <label class="consent"><input id="consent" type="checkbox"> This photo is of me, or of someone who has given me permission to use it. No minors.</label>
    <p id="sold-out" class="msg error" hidden>Sold out for now. Please check back soon.</p>
-   <button type="button" id="generate" class="btn big" disabled>Generate my video</button>
-   <p id="gen-hint" class="small muted"></p>
+   <button type="button" id="generate" class="btn big full" disabled>Generate my video · 100 credits</button>
+   <p id="gen-hint" class="small muted center"></p>
    <p id="gen-status" class="msg"></p>
    <div id="result" hidden>
     <video id="result-video" controls playsinline></video>
-    <div class="row"><a id="dl-song" class="btn" download="tiny-desk-ai-with-song.mp4" hidden>Download with song</a><a id="dl-silent" class="btn ghost" download="tiny-desk-ai-silent.mp4" hidden>Download silent</a><a id="dl-raw" class="link" download="tiny-desk-ai-original.mp4">Original file</a></div>
+    <div class="row"><a id="dl-song" class="btn" download="tiny-desk-ai-with-song.mp4" hidden>Download with song</a><a id="dl-silent" class="btn ghost" download="tiny-desk-ai-silent.mp4" hidden>Download silent</a><a id="dl-raw" class="link small" download="tiny-desk-ai-original.mp4">Original file</a></div>
    </div>
-   <div id="history-wrap" hidden><h3>Your videos (kept 7 days)</h3><ul id="history"></ul></div>
+   <p class="meta center">1 photo · 13 seconds · 9:16 · from $9.99 · <a href="#pricing">See pricing</a></p>
+   <details id="videos" class="history" hidden><summary>My videos <span class="muted small">(kept 7 days)</span></summary><ul id="history"></ul></details>
   </div>
  </div>
  <aside class="hero-side">
   <video src="/media/sample.mp4" poster="/media/sample.jpg" controls muted playsinline loop preload="none"></video>
-  <p class="small muted">Sample output (13 s, 480p). AI results vary.</p>
+  <p class="small muted center">Sample output · 13 s · 480p · AI results vary</p>
  </aside>
-</section>
-{DISC}
-<section id="pricing"><h2>Pricing</h2><p class="muted">One-time credit packs. 100 credits = one 13-second 480p video. Secure checkout by Stripe.</p>
+</div></section>
+<section id="pricing" class="band"><div class="wrap">
+<p class="eyebrow center">Pricing</p><h2 class="center">Simple credit packs</h2><p class="muted center">One-time payments, no subscription. 100 credits = one 13-second 480p video. Secure checkout by Stripe.</p>
 <div class="packs">
-<label class="pack"><input type="radio" name="pack" value="starter" checked><b>Starter</b><span class="price">$9.99</span><span>300 credits · 3 videos</span><span class="small muted">480p</span></label>
-<label class="pack"><input type="radio" name="pack" value="plus"><b>Plus</b><span class="price">$19.99</span><span>700 credits · 7 videos</span><span class="small muted">480p</span></label>
-<label class="pack"><input type="radio" name="pack" value="pro"><b>Pro</b><span class="price">$49.99</span><span>1,800 credits · 18 videos</span><span class="small muted">480p</span></label>
-</div><button type="button" id="buy" class="btn big">Buy credits</button><p id="buy-msg" class="msg"></p></section>
-<section id="how-it-works"><h2>How it works</h2><ol class="steps">
-<li><b>Upload a clear portrait.</b> Your browser checks for a face first. Confirm the photo is yours or that you have permission.</li>
-<li><b>Generate.</b> 100 credits are used and the AI recasts the lead singer. It usually takes about 2 minutes. If it fails, the credits come back.</li>
-<li><b>Download.</b> Your browser trims the clip to 13 seconds and gives you a version with the song and a silent copy.</li></ol></section>
-<section id="about"><h2>What is Tiny Desk AI?</h2>
+<div class="pack"><h3>Starter</h3><p class="price">$9.99</p><p>300 credits</p><ul><li>3 videos</li><li>Song + silent versions</li><li>480p, 9:16</li></ul><button type="button" class="btn ghost full buy" data-pack="starter">Buy Starter</button></div>
+<div class="pack pop"><span class="badge">Most popular</span><h3>Plus</h3><p class="price">$19.99</p><p>700 credits</p><ul><li>7 videos</li><li>Song + silent versions</li><li>480p, 9:16</li></ul><button type="button" class="btn full buy" data-pack="plus">Buy Plus</button></div>
+<div class="pack"><h3>Pro</h3><p class="price">$49.99</p><p>1,800 credits</p><ul><li>18 videos</li><li>Song + silent versions</li><li>480p, 9:16</li></ul><button type="button" class="btn ghost full buy" data-pack="pro">Buy Pro</button></div>
+</div><p id="buy-msg" class="msg center"></p><p class="small muted center">Credits are returned automatically if a video fails.</p></div></section>
+<section id="how-it-works"><div class="wrap">
+<p class="eyebrow center">How it works</p><h2 class="center">Three steps</h2><ol class="steps">
+<li><b>Upload a clear portrait</b><span>Your browser checks for a face first. Confirm the photo is yours or that you have permission.</span></li>
+<li><b>Generate</b><span>100 credits are used and the AI recasts the lead singer. It usually takes about 2 minutes. If it fails, the credits come back.</span></li>
+<li><b>Download</b><span>Your browser trims the clip to 13 seconds and gives you a version with the song and a silent copy.</span></li></ol>
+<p class="center"><a class="btn" href="#create">Add your photo</a></p></div></section>
+<section id="about" class="band"><div class="wrap narrow">
+<h2>What is Tiny Desk AI?</h2>
 <p>The <strong>Tiny Desk AI trend</strong> takes the end of Charlie Wilson's 2023 NPR Tiny Desk concert, where he closes with The Gap Band's "Outstanding", and uses AI to put new people in it. It went viral on TikTok in October 2026 with a parody starring college football coaches whose teams had just lost.</p>
-<ul>{"".join(f'<li><a href="{u}">{html.escape(t)}</a></li>' for u,t in GUIDES_LIST)}</ul></section>
-<section id="faq"><h2>FAQ</h2>{"".join(f"<details><summary>{html.escape(q)}</summary><p>{html.escape(a)}</p></details>" for q,a in faq)}<p><a href="/faq/">All FAQs</a></p></section>
-<section class="cta"><h2>Your lead-singer moment starts here</h2><a class="btn big" href="#create">Add your photo</a></section>
+<ul class="guide-list">{"".join(f'<li><a href="{u}">{html.escape(t)}</a></li>' for u,t in GUIDES_LIST)}</ul></div></section>
+<section id="faq"><div class="wrap faq-grid"><div><p class="eyebrow">FAQ</p><h2>Questions, answered</h2><p class="muted">More in the <a href="/faq/">full FAQ</a>.</p></div>
+<div>{"".join(f"<details><summary>{html.escape(q)}</summary><p>{html.escape(a)}</p></details>" for q,a in faq)}</div></div></section>
+<section class="cta"><div class="wrap"><h2>Your lead-singer moment starts here</h2><p>One photo, about two minutes.</p><a class="btn big" href="#create">Add your photo</a></div></section>
 """
 page("/","Tiny Desk AI – Make Your Own Outstanding Tiny Desk AI Video",
 "Tiny Desk AI video generator: upload one photo and get the Outstanding Tiny Desk AI clip with you as the lead singer, with the song and a silent copy. Unofficial fan tool.",
@@ -220,8 +260,9 @@ import shutil
 for root,dirs,files in os.walk("static"):
     for f in files:
         src=os.path.join(root,f); dst=os.path.join(OUT,os.path.relpath(src,"static")); os.makedirs(os.path.dirname(dst),exist_ok=True); shutil.copy(src,dst)
+page("/login/","Sign in – Tiny Desk Trend","Sign in or create an account on tinydesktrend.com.",'<h1>Sign in</h1><p>Sign in or create a free account to make your Tiny Desk AI video.</p><p class="row"><button type="button" class="btn" data-auth="login">Sign in</button><button type="button" class="btn ghost" data-auth="signup">Create account</button></p><p><a href="/#create">Back to the generator</a></p>',index=False)
 # 404
-open(f"{OUT}/404.html","w").write(f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Not found</title><link rel="stylesheet" href="/style.css"></head><body>{NAV}<h1>Page not found</h1><p><a href="/">Go home</a></p></body></html>')
+open(f"{OUT}/404.html","w").write(f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Not found</title><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><link rel="stylesheet" href="/style.css"><script type="module" src="/site.js"></script></head><body class="prose">{NAV}<main class="wrap narrow"><h1>Page not found</h1><p><a href="/">Go home</a></p></main>{FOOT}</body></html>')
 # sitemap/robots/llms
 open(f"{OUT}/sitemap.xml","w").write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+"".join(f"<url><loc>{D}{p}</loc><lastmod>{TODAY}</lastmod></url>\n" for p in pages)+"</urlset>\n")
 bots=["GPTBot","OAI-SearchBot","ClaudeBot","Claude-SearchBot","PerplexityBot","Google-Extended"]

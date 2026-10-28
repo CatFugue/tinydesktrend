@@ -1,57 +1,39 @@
-// Tiny Desk AI generator front end. No third-party trackers.
-const $ = (s, r = document) => r.querySelector(s);
+// Tiny Desk AI generator (homepage). No third-party trackers.
+import { $, api, postJSON, msg as _msg, state, refresh, onConfig, openAuth } from '/site.js';
 const FFMPEG_WASM = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm';
-let cfg = null;
 let photoOk = false;
+const msg = (el, t, k = '') => { el.textContent = t; el.className = 'msg ' + k; };
+const cfgOf = () => state.cfg;
 
-async function api(path, opts = {}) {
-  const r = await fetch(path, { credentials: 'same-origin', ...opts });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
-  return data;
-}
-const postJSON = (path, body) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-function msg(el, text, kind = '') { el.textContent = text; el.className = 'msg ' + kind; }
-
-async function loadConfig() {
-  cfg = await api('/api/config');
-  const acct = $('#account');
-  if (cfg.user) {
-    $('#auth-forms').hidden = true;
-    $('#signed-in').hidden = false;
-    $('#who').textContent = cfg.user.email;
-    $('#credits').textContent = cfg.user.credits;
-  } else {
-    $('#auth-forms').hidden = false;
-    $('#signed-in').hidden = true;
-  }
+onConfig((cfg) => {
   $('#sold-out').hidden = !cfg.soldOut;
-  $('#buy').disabled = !cfg.payments;
   updateGenerate();
-  if (cfg.user) loadHistory();
-  acct.dataset.ready = '1';
-}
+  if (cfg.user) loadHistory(); else $('#videos').hidden = true;
+  $('#account').dataset.ready = '1';
+});
 function updateGenerate() {
+  const cfg = cfgOf();
   const b = $('#generate');
-  const ok = cfg && cfg.user && cfg.generator && !cfg.soldOut && photoOk && $('#consent').checked;
-  b.disabled = !ok;
+  b.disabled = !(cfg && cfg.generator && !cfg.soldOut && photoOk && $('#consent').checked);
   const hint = $('#gen-hint');
   if (!cfg) return;
-  if (!cfg.user) hint.textContent = 'Create a free account or log in to generate.';
-  else if (cfg.soldOut) hint.textContent = 'Sold out for now. Please check back soon.';
-  else if (cfg.user.credits < cfg.videoCredits) hint.textContent = `You have ${cfg.user.credits} credits. A video costs ${cfg.videoCredits}. Pick a pack below.`;
-  else hint.textContent = `Uses ${cfg.videoCredits} credits. You have ${cfg.user.credits}.`;
+  if (cfg.soldOut) hint.textContent = 'Sold out for now. Please check back soon.';
+  else if (!photoOk) hint.textContent = 'Choose a photo to start.';
+  else if (!$('#consent').checked) hint.textContent = 'Tick the permission box to continue.';
+  else if (!cfg.user) hint.textContent = 'You will be asked to sign in or create a free account.';
+  else if (cfg.user.credits < cfg.videoCredits) hint.textContent = `You have ${cfg.user.credits} credits. Pick a pack to continue.`;
+  else hint.textContent = `You have ${cfg.user.credits} credits.`;
 }
-
-// ---- auth ----
-async function auth(kind) {
-  const m = $('#auth-msg');
-  try {
-    msg(m, kind === 'signup' ? 'Creating account…' : 'Logging in…');
-    await postJSON(`/api/auth/${kind}`, { email: $('#email').value, password: $('#password').value });
-    msg(m, '');
-    await loadConfig();
-  } catch (e) { msg(m, e.message, 'error'); }
+function needCredits() {
+  const cfg = cfgOf();
+  msg($('#buy-msg'), `A video costs ${cfg.videoCredits} credits and you have ${cfg.user.credits}. Pick a pack, then come back to Generate.`, 'error');
+  $('#pricing').scrollIntoView({ behavior: 'smooth' });
+}
+function onGenerate() {
+  const cfg = cfgOf();
+  if (!cfg.user) return openAuth('signup', onGenerate, 'Create a free account (or sign in) to generate your video. Your photo stays selected.');
+  if (cfg.user.credits < cfg.videoCredits) return needCredits();
+  generate();
 }
 
 // ---- face check (MediaPipe BlazeFace, runs in your browser) ----
@@ -76,6 +58,7 @@ async function checkPhoto(file) {
   const img = $('#preview');
   img.src = URL.createObjectURL(file);
   img.hidden = false;
+  $('#drop-text b').textContent = 'Change photo';
   await img.decode().catch(() => {});
   msg(m, 'Checking for a face…');
   try {
@@ -104,7 +87,7 @@ async function generate() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || 'Could not start.');
     localStorage.setItem('td_job', j.id);
-    await loadConfig();
+    await refresh();
     poll(j.id);
   } catch (e) { msg(st, e.message, 'error'); updateGenerate(); }
 }
@@ -114,9 +97,9 @@ async function poll(id) {
   for (;;) {
     let j;
     try { j = await api(`/api/jobs/${id}`); } catch (e) { msg(st, e.message, 'error'); return; }
-    if (j.status === 'succeeded' && j.hasVideo) { localStorage.removeItem('td_job'); await finish(id); loadConfig(); return; }
-    if (j.status === 'failed') { localStorage.removeItem('td_job'); msg(st, 'The video could not be made. Your credits were refunded.', 'error'); loadConfig(); return; }
-    if (j.status === 'reconcile') { msg(st, 'This is taking longer than usual. Your credits were refunded; if the video still arrives it will show up under "Your videos".', 'error'); loadConfig(); return; }
+    if (j.status === 'succeeded' && j.hasVideo) { localStorage.removeItem('td_job'); await finish(id); refresh(); return; }
+    if (j.status === 'failed') { localStorage.removeItem('td_job'); msg(st, 'The video could not be made. Your credits were refunded.', 'error'); refresh(); return; }
+    if (j.status === 'reconcile') { msg(st, 'This is taking longer than usual. Your credits were refunded; if the video still arrives it will show up under "My videos".', 'error'); refresh(); return; }
     msg(st, `Making your video… ${Math.round((Date.now() - t0) / 1000)} s (usually about 2 minutes). You can leave this page open.`);
     await new Promise((r) => setTimeout(r, 8000));
   }
@@ -175,32 +158,32 @@ async function loadHistory() {
       if (j.hasVideo) {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'link'; b.textContent = 'Open';
-        b.onclick = () => finish(j.id);
+        b.onclick = () => { finish(j.id); $('#result').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
         li.append(' · ', b);
       }
       list.append(li);
     }
-    $('#history-wrap').hidden = !m.jobs.length;
+    $('#videos').hidden = !m.jobs.length;
   } catch {}
 }
 
-async function buy() {
+async function buy(pack) {
   const m = $('#buy-msg');
-  const pack = document.querySelector('input[name="pack"]:checked')?.value || 'starter';
-  if (!cfg?.user) { msg(m, 'Create a free account or log in first (top of the page).', 'error'); $('#create').scrollIntoView(); return; }
+  const cfg = cfgOf();
+  if (!cfg?.payments) return msg(m, 'Payments are not available right now.', 'error');
+  if (!cfg.user) return openAuth('signup', () => buy(pack), 'Create a free account (or sign in) to buy credits.');
   try { msg(m, 'Opening secure checkout…'); const r = await postJSON('/api/checkout', { pack }); location.href = r.url; }
   catch (e) { msg(m, e.message, 'error'); }
 }
 
+function openVideos() { const d = $('#videos'); if (!d.hidden) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
 document.addEventListener('DOMContentLoaded', () => {
-  $('#signup').onclick = () => auth('signup');
-  $('#login').onclick = () => auth('login');
-  $('#logout').onclick = async () => { await postJSON('/api/auth/logout', {}); loadConfig(); };
   $('#photo').onchange = (e) => checkPhoto(e.target.files[0]);
   $('#consent').onchange = updateGenerate;
-  $('#generate').onclick = generate;
-  $('#buy').onclick = buy;
+  $('#generate').onclick = onGenerate;
+  document.querySelectorAll('.buy').forEach((b) => (b.onclick = () => buy(b.dataset.pack)));
+  document.querySelectorAll('[data-menu="videos"]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); openVideos(); }));
   const q = new URLSearchParams(location.search);
-  if (q.get('paid')) msg($('#gen-status'), 'Payment received. Credits appear here within a minute.', 'ok');
-  loadConfig().then(() => { const j = localStorage.getItem('td_job'); if (j && cfg.user) poll(j); }).catch(() => {});
+  if (q.get('paid')) msg($('#gen-status'), 'Payment received. Credits appear in the top-right corner within a minute.', 'ok');
+  const t = setInterval(() => { if (cfgOf()) { clearInterval(t); if (location.hash === '#videos') openVideos(); const j = localStorage.getItem('td_job'); if (j && cfgOf().user) poll(j); } }, 200);
 });

@@ -147,7 +147,7 @@ const supply = (env, delta, kind, ref, note) =>
 async function config(req, env) {
   const user = await currentUser(req, env);
   const avail = await supplyAvailable(env);
-  const payments = !!(await getSecret(env, 'STRIPE_SECRET_KEY')) && Object.values(PACKS).every((p) => !!env[p.env]);
+  const payments = !!(await getSecret(env, 'STRIPE_SECRET_KEY')) && !!(await getSecret(env, 'STRIPE_WEBHOOK_SECRET')) && (await Promise.all(Object.values(PACKS).map((p) => getSecret(env, p.env)))).every(Boolean);
   return json({
     payments,
     soldOut: avail < SUPPLY_CENTI,
@@ -174,24 +174,35 @@ async function aesKey(env, name) {
   const raw = await crypto.subtle.digest('SHA-256', enc.encode(`${env.ADMIN_TOKEN}:${name}`));
   return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
-const validSecret = { STRIPE_SECRET_KEY: (v) => /^(sk|rk)_(live|test)_[A-Za-z0-9]{20,}$/.test(v || ''), METASO_API_KEY: (v) => (v || '').trim().length >= 20 };
+const validSecret = {
+  STRIPE_SECRET_KEY: (v) => /^(sk|rk)_(live|test)_[A-Za-z0-9]{20,}$/.test(v || ''),
+  STRIPE_WEBHOOK_SECRET: (v) => /^whsec_[A-Za-z0-9+/=]{20,}$/.test(v || ''),
+  STRIPE_PRICE_STARTER: (v) => /^price_[A-Za-z0-9]{8,}$/.test(v || ''),
+  STRIPE_PRICE_PLUS: (v) => /^price_[A-Za-z0-9]{8,}$/.test(v || ''),
+  STRIPE_PRICE_PRO: (v) => /^price_[A-Za-z0-9]{8,}$/.test(v || ''),
+  METASO_API_KEY: (v) => (v || '').trim().length >= 20,
+};
+// Encrypted KV value (cfg/<name>, set via /api/admin/secret) wins over the Worker binding, so a
+// value can be rotated without redeploying; the binding is the fallback.
 async function getSecret(env, name) {
-  if (validSecret[name](env[name])) return env[name].trim();
-  if (secretCache[name]) return secretCache[name];
-  const blob = await env.VIDEOS.get(`cfg/${name}`, 'arrayBuffer');
-  if (!blob || !env.ADMIN_TOKEN) return null;
-  try {
-    const b = new Uint8Array(blob);
-    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, await aesKey(env, name), b.slice(12));
-    return (secretCache[name] = new TextDecoder().decode(pt));
-  } catch { return null; }
+  const c = secretCache[name];
+  if (c && Date.now() - c.t < 60000) return c.v;
+  const blob = env.ADMIN_TOKEN ? await env.VIDEOS.get(`cfg/${name}`, 'arrayBuffer') : null;
+  if (blob) {
+    try {
+      const b = new Uint8Array(blob);
+      const pt = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, await aesKey(env, name), b.slice(12)));
+      if (validSecret[name](pt)) { secretCache[name] = { v: pt, t: Date.now() }; return pt; }
+    } catch {}
+  }
+  return validSecret[name](env[name]) ? env[name].trim() : null;
 }
 async function putSecret(env, name, value) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(env, name), enc.encode(value)));
   const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12);
   await env.VIDEOS.put(`cfg/${name}`, out);
-  secretCache[name] = value;
+  secretCache[name] = { v: value, t: Date.now() };
 }
 
 // ---------- Stripe ----------
@@ -201,7 +212,7 @@ async function checkout(req, env) {
   const b = await req.json().catch(() => ({}));
   const pack = PACKS[b.pack];
   if (!pack) return err(400, 'Choose a credit pack.');
-  const price = env[pack.env];
+  const price = await getSecret(env, pack.env);
   const stripeKey = await getSecret(env, 'STRIPE_SECRET_KEY');
   if (!stripeKey || !price) return err(503, 'Payments are not available right now.');
   if (await limited(env, `checkout:${user.id}`, 20, 3600)) return err(429, 'Too many checkout attempts. Try again later.');
@@ -260,7 +271,7 @@ async function verifyStripe(body, header, secret) {
 }
 async function webhook(req, env) {
   const body = await req.text();
-  if (!(await verifyStripe(body, req.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET))) return err(400, 'Invalid signature.');
+  if (!(await verifyStripe(body, req.headers.get('Stripe-Signature'), await getSecret(env, 'STRIPE_WEBHOOK_SECRET')))) return err(400, 'Invalid signature.');
   let ev;
   try { ev = JSON.parse(body); } catch { return err(400, 'Invalid event.'); }
   const obj = ev?.data?.object || {};
@@ -509,7 +520,7 @@ async function admin(req, env, path) {
   if (path === '/api/admin/diag') {
     const k = (await getSecret(env, 'STRIPE_SECRET_KEY')) || '';
     const m = (await getSecret(env, 'METASO_API_KEY')) || '';
-    return json({ stripeLen: k.length, stripeHash: (await sha256(k)).slice(0, 12), metasoLen: m.length, metasoHash: (await sha256(m)).slice(0, 12), whLen: (env.STRIPE_WEBHOOK_SECRET || '').length });
+    return json({ stripeLen: k.length, stripeHash: (await sha256(k)).slice(0, 12), metasoLen: m.length, metasoHash: (await sha256(m)).slice(0, 12), whHash: (await sha256((await getSecret(env, 'STRIPE_WEBHOOK_SECRET')) || '')).slice(0, 12), prices: await Promise.all(Object.values(PACKS).map((p) => getSecret(env, p.env))) });
   }
   if (path === '/api/admin/funnel') {
     const rows = await env.DB.prepare('SELECT event, COUNT(*) AS n FROM funnel_events GROUP BY event').all();

@@ -6,3 +6,4 @@ secrets/
 .wrangler/
 .DS_Store
 __pycache__/
+public/

@@ -1,0 +1,9 @@
+Recreate the reference video shot for shot. Keep everything from the reference video exactly: the room, the shelves, the red mixing desk, every other person in headsets and their clothes, the camera framing and motion, all cuts, timing, poses, gestures, head turns, hand movements, expressions and lip movement of the lead singer.
+
+Replace the lead singer (the man wearing the red baseball cap with the white "A" logo and the black ALABAMA hoodie) with the person in the reference image, head to toe:
+- Face, facial features, hairstyle and hair color come from the reference image.
+- Skin tone comes from the reference image and is the same on the face, neck and hands. Do not keep the original man's skin tone anywhere.
+- Body build comes from the reference image. The clothes drape naturally on this new body.
+- Remove the original man's facial hair. Only show facial hair or marks if the reference image has them.
+
+Keep the lead singer's outfit unchanged: the same red baseball cap with the white "A" logo and the same black ALABAMA hoodie, same colors and fit. Every other person stays exactly as in the reference video.

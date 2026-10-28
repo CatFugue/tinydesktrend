@@ -46,7 +46,11 @@ f"""<h1>Tiny Desk AI: the "Outstanding" Tiny Desk AI video trend</h1>{DISC}
 <h2>Guides</h2><ul>
 <li><a href="/guides/what-is-the-tiny-desk-ai-trend/">Where the Tiny Desk AI trend came from</a></li>
 <li><a href="/guides/how-to-make-outstanding-tiny-desk-ai-video/">How to make an Outstanding Tiny Desk AI video</a></li>
-<li><a href="/guides/outstanding-tiny-desk-song/">What is the song in the Tiny Desk AI video?</a></li></ul>
+<li><a href="/guides/outstanding-tiny-desk-song/">What is the song in the Tiny Desk AI video?</a></li>
+<li><a href="/guides/tiny-desk-ai-video-generator/">Tiny Desk AI video generator: free and paid options</a></li>
+<li><a href="/guides/outstanding-tiny-desk-ai-template/">Outstanding Tiny Desk AI template</a></li>
+<li><a href="/guides/outstanding-tiny-desk-meme-ideas/">Outstanding Tiny Desk meme ideas</a></li>
+<li><a href="/guides/outstanding-gap-band-song-facts/">"Outstanding" by The Gap Band: facts</a></li></ul>
 <h2>Quick answers</h2>{"".join(f"<h3>{html.escape(q)}</h3><p>{html.escape(a)}</p>" for q,a in faq[:4])}<p><a href="/faq/">All FAQs →</a></p>""",
 [web_ld,{"@context":"https://schema.org","@type":"WebApplication","name":"Tiny Desk AI (coming soon)","url":D+"/","applicationCategory":"MultimediaApplication","operatingSystem":"Web","description":"Unofficial photo-to-video tool for the Outstanding Tiny Desk AI trend. Launching soon."}])
 page("/faq/","Tiny Desk AI FAQ – Song, Length, How It's Made","Answers to common questions about the Tiny Desk AI trend: the song, whether it is real, clip length and how to make your own.",f"<h1>Tiny Desk AI FAQ</h1>{faq_html}",[faq_ld])
@@ -84,8 +88,67 @@ page(g3,t3,d3,f"""<h1>{t3}</h1><p><em>Updated {TODAY}</em></p>
 <h2>Who is Charlie Wilson?</h2><p>Charlie Wilson was the lead singer of The Gap Band, which he formed with his brothers Robert and Ronnie; the group's hits ran from the 1970s through the '80s. He later became a frequent hip-hop collaborator, nicknamed "Uncle Charlie" by Snoop Dogg. (<a href="{SRC_NPR}" rel="nofollow">NPR</a>)</p>
 <h2>Full Tiny Desk set list</h2><ol><li>Charlie, Last Name Wilson</li><li>Computer Love</li><li>There Goes My Baby</li><li>I'm Blessed</li><li>Yearning For Your Love</li><li>Sweet Yamz</li><li>Outstanding</li></ol><p>Source: <a href="{SRC_NPR}" rel="nofollow">NPR</a>, <a href="{SRC_RS}" rel="nofollow">Rolling Stone</a>.</p>
 <h2>Using the song in your post</h2><p>The song is copyrighted. Platforms such as TikTok may mute or restrict uploads that contain it; using the platform's own sound library or a silent copy is the usual workaround.</p>""",[art(t3,d3,g3)])
+SRC_WIKI="https://en.wikipedia.org/wiki/Outstanding"
+SRC_WS="https://www.whosampled.com/The-Gap-Band/"
+SRC_SEA="https://seadanse.com/blog/tiny-desk-ai-for-your-team"
+SRC_JUT="https://jutsustudio.com/video-api-pricing/seedance-2-0-mini/"
+SRC_WAVE="https://wavespeed.ai/models/bytedance/seedance-2.0-mini/video-edit"
+SRC_OT="https://outstandingtinydesk.com/blog/outstanding-tiny-desk-ai-trend"
+g4="/guides/tiny-desk-ai-video-generator/"
+t4="Tiny Desk AI Video Generator: Free and Paid Options Explained"; d4="Is there a free Tiny Desk AI video generator? What a Tiny Desk AI maker needs, what the AI model behind it costs, and what to check before you upload a photo."
+page(g4,t4,d4,f"""<h1>{t4}</h1><p><em>Updated {TODAY}</em></p>{DISC}
+<h2>Is there a free Tiny Desk AI generator?</h2><p>Not really. The tools making this trend run a paid video-edit model on every clip. Public price lists put the Seedance 2.0 mini model at roughly $0.02 to $0.07 per second of 480p video, depending on the provider and whether a reference video is used (<a href="{SRC_JUT}" rel="nofollow">price comparison, checked Oct 27, 2026</a>). A full clip needs about 19 seconds of output, plus retries when a face swap fails, so a "free" tool is either a limited trial or paying for it some other way.</p>
+<h2>What a Tiny Desk AI maker has to do</h2><ul>
+<li>Take the vertical ~19-second "Outstanding" clip as the reference video.</li>
+<li>Replace the lead singer (and optionally the band) with the people in your photos using a video edit mode.</li>
+<li>Split the job at the 13-second hard cut, because one generation is capped at about 15 seconds (<a href="{SRC_WAVE}" rel="nofollow">model limits</a>).</li>
+<li>Check the faces in the result, join the parts and add the song back.</li></ul>
+<h2>What to check before you pay for one</h2><ul>
+<li><strong>Resolution and length:</strong> 480p or 720p, and whether you get the full ~19 seconds.</li>
+<li><strong>Song and silent copy:</strong> platforms sometimes mute the original song, so a silent copy is useful.</li>
+<li><strong>Refund on a bad swap:</strong> AI swaps sometimes leave an original face in place.</li>
+<li><strong>Photo handling:</strong> how long your photo is kept, and whether it is used for anything else.</li>
+<li><strong>Consent:</strong> only upload photos of yourself or people who agreed.</li></ul>
+<h2>Our generator</h2><p>Tiny Desk Trend's own generator is <a href="/#generator">launching soon</a>. Until then, the <a href="/guides/how-to-make-outstanding-tiny-desk-ai-video/">how-to guide</a> covers the method.</p>""",[art(t4,d4,g4)])
+g5="/guides/outstanding-tiny-desk-ai-template/"
+t5="Outstanding Tiny Desk AI Template: Shots, Timing and Who Goes Where"; d5="The Outstanding Tiny Desk AI template broken down: 9:16 format, 19.06 seconds, five shots, and which roles (lead, keys, backing singers, sax) you can recast."
+roles=[("Lead singer","Shots 1 and 3, including the big laugh close-up. This is the role almost every version recasts."),("Keys player","Front and centre in the band shots (2 and 5). Easy to mistake for the lead at first glance."),("Two backing singers","Behind the keys in the band shots."),("Sax player","Gets the solo in shot 4, right after the 13-second cut, so it often goes to the surprise cast member.")]
+page(g5,t5,d5,f"""<h1>{t5}</h1><p><em>Updated {TODAY}</em></p>
+<p>The "template" everyone recasts is the vertical cut of the last ~19 seconds of Charlie Wilson's 2023 Tiny Desk performance of "Outstanding". Specs below come from a <a href="{SRC_HF}" rel="nofollow">frame-by-frame breakdown</a>.</p>
+<h2>Format</h2><ul><li>Vertical 9:16, 720×1280</li><li>24 fps</li><li>19.06 seconds</li><li>Five shots, with a hard cut at exactly 13.0 seconds</li></ul>
+<h2>The five shots</h2><table><tr><th>Shot</th><th>Time (s)</th><th>What's in it</th></tr>
+<tr><td>1</td><td>0–1.375</td><td>Lead singer's opening line, side-on</td></tr><tr><td>2</td><td>1.375–6.708</td><td>Band: keys in front, two singers behind</td></tr><tr><td>3</td><td>6.708–13.0</td><td>The big laugh close-up of the lead</td></tr><tr><td>4</td><td>13.0–16.375</td><td>Sax solo</td></tr><tr><td>5</td><td>16.375–19.06</td><td>The band again</td></tr></table>
+<h2>Roles you can recast</h2><ul>{"".join(f"<li><strong>{a}:</strong> {b}</li>" for a,b in roles)}</ul>
+<h2>Tips</h2><ul><li>Use one person per role. Putting the same face in two roles made swaps fail in published tests.</li><li>Use the vertical cut, not the widescreen original, so the framing matches.</li><li>Keep the song timing intact so the audio lines up.</li></ul>
+<p>Next: <a href="/guides/outstanding-tiny-desk-meme-ideas/">casting ideas</a> · <a href="/guides/how-to-make-outstanding-tiny-desk-ai-video/">how to make it</a></p>""",[art(t5,d5,g5)])
+g6="/guides/outstanding-tiny-desk-meme-ideas/"
+t6="Outstanding Tiny Desk Meme: What It Means and Casting Ideas"; d6="What the Outstanding Tiny Desk meme means, how fans cast it (losing teams, coworkers, group chats) and the simple rules good versions follow."
+page(g6,t6,d6,f"""<h1>{t6}</h1><p><em>Updated {TODAY}</em></p>
+<h2>What the meme means</h2><p>The joke is contrast: people who just had a bad week appear as a joyful band singing a song literally called "Outstanding". The first version, posted October 18, 2026, cast the coaches of college football teams that had lost that weekend and called itself an AI parody (<a href="{SRC_HF}" rel="nofollow">source</a>). Fan versions for NFL teams followed within days (<a href="{SRC_OT}" rel="nofollow">source</a>).</p>
+<h2>Casting ideas</h2><ul>
+<li><strong>Your team after a loss:</strong> the format the trend started with.</li>
+<li><strong>The office:</strong> the team that just missed a deadline, with the manager on sax.</li>
+<li><strong>Fantasy league:</strong> last place sings lead.</li>
+<li><strong>Family or group chat:</strong> whoever had the worst week gets the close-up.</li>
+<li><strong>Yourself:</strong> one photo, you on lead, for your own "outstanding" week.</li></ul>
+<h2>Rules good versions follow</h2><ol>
+<li>The close-up goes to the person the joke is about.</li>
+<li>The sax solo is the punchline, so save it for the surprise.</li>
+<li>The caption names the bad week.</li>
+<li>Label it as AI, in the caption and with your app's AI label.</li>
+<li>Only use faces of people who are in on the joke, and never minors.</li></ol>
+<p>See the <a href="/guides/outstanding-tiny-desk-ai-template/">template breakdown</a> for which roles exist.</p>""",[art(t6,d6,g6)])
+g7="/guides/outstanding-gap-band-song-facts/"
+t7="\"Outstanding\" by The Gap Band: Release Date, Writer, Charts and Samples"; d7="Facts about \"Outstanding\" by The Gap Band, the song in the Tiny Desk AI trend: released November 1982, written by Raymond Calhoun, R&B No. 1, covers and samples."
+page(g7,t7,d7,f"""<h1>{t7}</h1><p><em>Updated {TODAY}</em></p>
+<table><tr><th>Artist</th><td>The Gap Band</td></tr><tr><th>Album</th><td><em>Gap Band IV</em> (1982)</td></tr><tr><th>Released as a single</th><td>November 1982 (Total Experience)</td></tr><tr><th>Songwriter</th><td>Raymond Calhoun</td></tr><tr><th>Length</th><td>3:19 album version, 6:13 extended version</td></tr><tr><th>Peak charts</th><td>No. 1 US Billboard Hot Black Singles (February 1983), No. 51 Billboard Hot 100, No. 68 UK</td></tr></table>
+<p>Source: <a href="{SRC_WIKI}" rel="nofollow">Wikipedia</a>.</p>
+<h2>Covers</h2><p>British singer Kenny Thomas covered it in 1990; his version reached No. 12 on the UK Singles Chart (<a href="{SRC_WIKI}" rel="nofollow">Wikipedia</a>).</p>
+<h2>Songs that sample it</h2><ul><li>Da Brat, "Da B Side" (1994)</li><li>Ashanti feat. Ja Rule, "Happy" (2002)</li><li>Tyler, The Creator, "911 / Mr. Lonely" (2017)</li></ul><p>Source: <a href="{SRC_WS}" rel="nofollow">WhoSampled</a>.</p>
+<h2>Lyrics</h2><p>We don't reproduce the lyrics here because they are copyrighted; licensed lyric sites and streaming apps carry them.</p>
+<h2>Why it's in the Tiny Desk AI trend</h2><p>Charlie Wilson, The Gap Band's lead singer, closed his 2023 NPR Tiny Desk concert with it, and the meme recasts the last ~19 seconds of that performance. More in <a href="/guides/outstanding-tiny-desk-song/">What is the song in the Tiny Desk AI video?</a></p>""",[art(t7,d7,g7)])
 page("/guides/","Tiny Desk AI Guides","Guides to the Tiny Desk AI trend: origin, how to make one, and the song.",
-f'<h1>Tiny Desk AI guides</h1><ul><li><a href="{g1}">{t1}</a></li><li><a href="{g2}">{t2}</a></li><li><a href="{g3}">{t3}</a></li></ul>')
+'<h1>Tiny Desk AI guides</h1><ul>'+"".join(f'<li><a href="{g}">{t}</a></li>' for g,t in [(g1,t1),(g2,t2),(g3,t3),(g4,t4),(g5,t5),(g6,t6),(g7,t7)])+'</ul>')
 page("/privacy/","Privacy Policy – Tiny Desk Trend","What tinydesktrend.com collects (almost nothing).",f"""<h1>Privacy Policy</h1><p><em>Last updated {TODAY}</em></p>
 <p>tinydesktrend.com is currently a static information site. It has no accounts, no forms, no uploads, no payments, no cookies and no analytics or advertising scripts.</p>
 <h2>Hosting logs</h2><p>The site is served by Cloudflare. Like any web host, Cloudflare processes technical request data (such as IP address, user agent and requested URL) to deliver the site and protect it from abuse. See Cloudflare's privacy policy at https://www.cloudflare.com/privacypolicy/.</p>
@@ -112,6 +175,10 @@ open(f"{OUT}/llms.txt","w").write(f"""# Tiny Desk Trend (tinydesktrend.com)
 - [{t1}]({D}{g1}): origin of the meme
 - [{t2}]({D}{g2}): how the video is made
 - [{t3}]({D}{g3}): the song ("Outstanding" by The Gap Band, 1982)
+- [{t4}]({D}{g4})
+- [{t5}]({D}{g5})
+- [{t6}]({D}{g6})
+- [{t7}]({D}{g7})
 - [FAQ]({D}/faq/)
 
 ## Policies

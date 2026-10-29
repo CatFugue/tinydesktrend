@@ -30,9 +30,10 @@ const err = (status, error) => json({ error }, status);
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval' blob:",
+  // static.cloudflareinsights.com / cloudflareinsights.com: Cloudflare Web Analytics beacon and its reports.
+  "script-src 'self' 'wasm-unsafe-eval' blob: https://static.cloudflareinsights.com",
   "worker-src 'self' blob:",
-  "connect-src 'self' https://cdn.jsdelivr.net blob: data:",
+  "connect-src 'self' https://cdn.jsdelivr.net https://cloudflareinsights.com blob: data:",
   "img-src 'self' data: blob:",
   "media-src 'self' blob:",
   "style-src 'self'",

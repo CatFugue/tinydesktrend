@@ -199,7 +199,13 @@ document.addEventListener('DOMContentLoaded', () => {
   v.addEventListener('play', () => showPlaying(true));
   v.addEventListener('pause', () => showPlaying(false));
   showPlaying(false);
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) v.play().catch(() => {});
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Only fetch and play the sample once it is on screen.
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); v.play().catch(() => {}); }
+    });
+    io.observe(v);
+  }
   play.onclick = () => (v.paused ? v.play().catch(() => {}) : v.pause());
   sound.onclick = () => {
     v.muted = !v.muted;

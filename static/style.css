@@ -261,6 +261,22 @@ section{padding:84px 0}
 .prose main li{margin:.35rem 0}
 .prose main ul,.prose main ol{padding-left:1.3rem}
 .prose main em{color:var(--muted)}
+.crumbs{font-size:.9rem;font-weight:600;color:var(--muted);margin:0 0 .4rem}
+.crumbs a{color:var(--ink-2);text-decoration:none}
+.crumbs a:hover{color:var(--tomato-2);text-decoration:underline}
+.byline{color:var(--muted);font-size:.95rem;margin:-.2rem 0 1.4rem}
+.prose main .lead{max-width:62ch}
+.more{margin-top:-.4rem;font-weight:700}
+.guide-end{margin:3rem 0 0;padding-top:2rem;border-top:var(--bw) dashed var(--line)}
+.guide-cta{background:var(--sun);border:var(--bw) solid var(--ink);border-radius:var(--r);box-shadow:var(--lift);padding:22px 24px;margin-bottom:2rem}
+.prose main .guide-cta h2{margin:0 0 .3rem;font-size:1.6rem}
+.guide-cta p{margin:0 0 14px}
+.related,.guide-index{list-style:none;padding:0!important;margin:0;display:grid;gap:12px}
+.related li,.guide-index li{border:var(--bw) solid var(--ink);border-radius:16px;background:var(--card);box-shadow:var(--lift);padding:14px 18px;display:flex;flex-direction:column;gap:2px;margin:0!important;max-width:none!important}
+.related a,.guide-index a{font-family:var(--display);font-weight:900;font-size:1.15rem;line-height:1.2;color:var(--ink);text-decoration:none;font-variation-settings:"SOFT" 100}
+.related a:hover,.guide-index a:hover{color:var(--tomato-2)}
+.related span,.guide-index span{color:var(--ink-2);font-size:.97rem}
+.guide-index{margin:1.4rem 0 1.6rem}
 table{border-collapse:separate;border-spacing:0;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);overflow:hidden;background:var(--card);margin:1rem 0;font-variant-numeric:tabular-nums}
 td,th{border-bottom:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
 th{background:var(--paper-2);font-weight:700}

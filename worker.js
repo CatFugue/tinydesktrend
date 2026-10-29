@@ -47,6 +47,7 @@ function secure(res) {
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('X-Frame-Options', 'DENY');
   h.set('Content-Security-Policy', CSP);
+  h.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
 }
 
@@ -563,8 +564,9 @@ async function api(req, env, url) {
 export default {
   async fetch(req, env) {
     const u = new URL(req.url);
-    if (u.hostname === 'www.tinydesktrend.com') {
+    if (u.hostname === 'www.tinydesktrend.com' || (u.protocol === 'http:' && u.hostname === 'tinydesktrend.com')) {
       u.hostname = 'tinydesktrend.com';
+      u.protocol = 'https:';
       return Response.redirect(u.toString(), 301);
     }
     if (u.pathname.startsWith('/api/')) {

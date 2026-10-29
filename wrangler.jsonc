@@ -1,0 +1,30 @@
+// Mirrors the bindings deployed by deploy_script.py, so `npx wrangler deploy` can publish from any machine.
+// Secrets (METASO_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, ADMIN_TOKEN) stay on the Worker and are not listed here.
+{
+  "name": "tinydesktrend",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "tinydesktrend.com", "custom_domain": true },
+    { "pattern": "www.tinydesktrend.com", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "tinydesktrend-db", "database_id": "5338cb59-c4c7-42cd-8a48-1287bf4bdf67" }
+  ],
+  "kv_namespaces": [{ "binding": "VIDEOS", "id": "a5fbe0d6cec1495dae0c8679aea8aae4" }],
+  "vars": {
+    "STRIPE_PRICE_STARTER": "price_1UVPd94VJta90MPRa6w6A9WD",
+    "STRIPE_PRICE_PLUS": "price_1UVPd94VJta90MPRiJM93Lo9",
+    "STRIPE_PRICE_PRO": "price_1UVPd94VJta90MPREOMRc8gT",
+    "SOURCE_FILE": "mm_file://2115297117809086464"
+  },
+  "triggers": { "crons": ["* * * * *"] }
+}

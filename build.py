@@ -1,9 +1,21 @@
 import os, json, html, datetime, secrets
-from PIL import Image, ImageDraw, ImageFont
 D="https://tinydesktrend.com"; OUT="public"; TODAY="2026-10-28"
 os.makedirs(OUT,exist_ok=True)
-NAV="""<header class="site-header"><div class="wrap hdr">
-<a class="logo" href="/" aria-label="Tiny Desk Trend home"><span class="logo-mark" aria-hidden="true">TD</span><span>Tiny Desk AI</span></a>
+def svg(paths,cls=""):
+    c=f' class="{cls}"' if cls else ""
+    return f'<svg{c} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{paths}</svg>'
+I_MIC=svg('<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21.5M8.5 21.5h7"/>')
+I_UP=svg('<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V15"/>')
+I_CHECK=svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>')
+I_ARROW=svg('<path d="M5 12h14M13 6l6 6-6 6"/>')
+I_SOUND=svg('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>')
+I_PAUSE=svg('<path d="M9 5.5v13M15 5.5v13"/>','i-pause')
+I_PLAY=svg('<path d="M7.5 5v14l11-7z"/>','i-play')
+I_X=svg('<path d="M6 6l12 12M18 6 6 18"/>')
+I_STAR=svg('<path d="M12 3.5l2.4 5 5.4.6-4 3.7 1.1 5.4L12 15.5l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/>')
+MARK=f'<span class="logo-mark" aria-hidden="true">{I_MIC}</span>'
+NAV=f"""<header class="site-header"><div class="wrap hdr">
+<a class="logo" href="/" aria-label="Tiny Desk Trend home">{MARK}<span>Tiny Desk AI</span></a>
 <nav class="main-nav" id="main-nav" aria-label="Main"><a href="/#create">Create</a><a href="/#pricing">Pricing</a><a href="/#how-it-works">How it works</a><a href="/guides/">Guides</a><a href="/#faq">FAQ</a></nav>
 <div class="hdr-right">
  <div class="auth-out" id="hdr-out"><button type="button" class="btn ghost sm" data-auth="login">Sign in</button><button type="button" class="btn sm hide-xs" data-auth="signup">Sign up</button></div>
@@ -12,7 +24,7 @@ NAV="""<header class="site-header"><div class="wrap hdr">
    <div class="acct-menu" id="acct-menu" hidden><p class="acct-email" id="hdr-email"></p><a href="/#videos" data-menu="videos">My videos</a><a href="/#pricing">Buy credits</a><button type="button" id="hdr-logout">Sign out</button></div></div></div>
  <button type="button" class="burger" id="burger" aria-label="Menu" aria-controls="main-nav" aria-expanded="false"><span></span><span></span><span></span></button>
 </div></div></header>
-<dialog class="modal" id="auth-modal" aria-labelledby="auth-title"><form method="dialog" class="modal-x"><button aria-label="Close">×</button></form>
+<dialog class="modal" id="auth-modal" aria-labelledby="auth-title"><form method="dialog" class="modal-x"><button aria-label="Close">{I_X}</button></form>
 <h2 id="auth-title">Sign in</h2><p class="muted small" id="auth-sub">Use your email and a password. No email verification needed.</p>
 <div class="tabs" role="tablist"><button type="button" role="tab" data-tab="login" class="on">Sign in</button><button type="button" role="tab" data-tab="signup">Create account</button></div>
 <form id="auth-form" class="auth-form"><label>Email <input id="email" type="email" autocomplete="email" required></label>
@@ -21,32 +33,12 @@ NAV="""<header class="site-header"><div class="wrap hdr">
 <p class="small muted">By continuing you agree to the <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy Policy</a>.</p></form></dialog>"""
 DISC='<p class="disc"><strong>Unofficial fan tool.</strong> Tiny Desk Trend is not affiliated with, endorsed by, or connected to NPR, NPR Music, or Tiny Desk Concerts. No NPR or Tiny Desk logos or official assets are used on this site.</p>'
 FOOT=f"""<footer class="site-footer"><div class="wrap">
-<div class="foot-grid"><div><a class="logo" href="/"><span class="logo-mark" aria-hidden="true">TD</span><span>Tiny Desk AI</span></a><p class="small">An unofficial photo-to-video tool for the "Outstanding" Tiny Desk AI trend.</p></div>
+<div class="foot-grid"><div><a class="logo" href="/">{MARK}<span>Tiny Desk AI</span></a><p class="small">An unofficial photo-to-video tool for the "Outstanding" Tiny Desk AI trend.</p></div>
 <div><h3>Product</h3><a href="/#create">Create a video</a><a href="/#pricing">Pricing</a><a href="/#how-it-works">How it works</a><a href="/faq/">FAQ</a></div>
 <div><h3>Guides</h3><a href="/guides/what-is-the-tiny-desk-ai-trend/">Trend origin</a><a href="/guides/outstanding-tiny-desk-song/">The song</a><a href="/guides/outstanding-tiny-desk-ai-template/">The template</a><a href="/guides/">All guides</a></div>
 <div><h3>Legal</h3><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="mailto:privacy@tinydesktrend.com">Contact</a></div></div>
 {DISC}<p class="small">© 2026 tinydesktrend.com</p></div></footer>"""
-CSS="""*{box-sizing:border-box}html{scroll-padding-top:76px}.msg:empty{min-height:0;margin:0}.meta{margin:12px 0 0;font-size:.85rem;color:#6b5e50}body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;line-height:1.6;color:#1f1b16;background:#fbf7f0}a{color:#8a4614}img,video{max-width:100%}
-.wrap{max-width:1120px;margin:0 auto;padding:0 20px}.wrap.narrow{max-width:780px}.prose main{padding-top:24px;padding-bottom:24px}h1{font-size:2.1rem;line-height:1.15;margin:.3rem 0 .6rem}h2{font-size:1.7rem;line-height:1.2;margin:0 0 .6rem}.prose h2{font-size:1.35rem;margin-top:2rem}.center{text-align:center}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.75rem;font-weight:700;color:#8a4614;margin:0 0 .3rem}
-.site-header{position:sticky;top:0;z-index:50;background:rgba(251,247,240,.94);backdrop-filter:blur(8px);border-bottom:1px solid #eadfce}.hdr{display:flex;align-items:center;gap:16px;height:64px}.logo{display:flex;align-items:center;gap:8px;font-weight:800;color:#1f1b16;text-decoration:none;white-space:nowrap}.logo-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:#b0652a;color:#fff;font-size:.8rem}
-.main-nav{flex:1;display:flex;justify-content:center;gap:26px}.main-nav a{color:#3b3229;text-decoration:none;font-size:.95rem;font-weight:500}.main-nav a:hover{color:#8a4614}.hdr-right{display:flex;align-items:center;gap:8px}.auth-out,.auth-in{display:flex;align-items:center;gap:8px}[hidden]{display:none!important}
-.credit-pill{border:1px solid #e3d6c3;background:#fff;border-radius:999px;padding:5px 12px;font-size:.88rem;color:#1f1b16;text-decoration:none;white-space:nowrap}.acct{position:relative}.acct-btn{width:36px;height:36px;border-radius:50%;border:0;background:#1f1b16;color:#fff;font-weight:700;cursor:pointer;text-transform:uppercase}.acct-menu{position:absolute;right:0;top:44px;background:#fff;border:1px solid #e3d6c3;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);min-width:220px;padding:6px;display:flex;flex-direction:column}.acct-menu a,.acct-menu button{padding:9px 12px;border-radius:8px;text-align:left;background:none;border:0;font:inherit;color:#1f1b16;text-decoration:none;cursor:pointer}.acct-menu a:hover,.acct-menu button:hover{background:#f5ede1}.acct-email{margin:0;padding:8px 12px;font-size:.85rem;color:#6b5e50;border-bottom:1px solid #eee;overflow:hidden;text-overflow:ellipsis}
-.burger{display:none;width:40px;height:40px;border:1px solid #e3d6c3;border-radius:10px;background:#fff;flex-direction:column;justify-content:center;align-items:center;gap:4px;cursor:pointer}.burger span{display:block;width:18px;height:2px;background:#1f1b16}
-.btn{background:#b0652a;color:#fff;border:1px solid #b0652a;border-radius:10px;padding:10px 16px;font-weight:700;font-size:.95rem;cursor:pointer;text-decoration:none;display:inline-block;text-align:center;font-family:inherit}.btn:hover{background:#97531f}.btn.ghost{background:#fff;color:#8a4614}.btn.ghost:hover{background:#f5ede1}.btn.sm{padding:7px 14px;font-size:.88rem}.btn.big{font-size:1.05rem;padding:13px 22px}.btn.full{width:100%}.btn:disabled{opacity:.45;cursor:not-allowed}.link{background:none;border:0;color:#8a4614;text-decoration:underline;cursor:pointer;padding:0;font:inherit}
-.hero{padding:36px 0 48px}.hero-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.85fr);gap:40px;align-items:start}.lead{font-size:1.08rem;color:#3b3229;margin:0 0 18px}.hero-side video{width:100%;max-width:380px;aspect-ratio:9/16;object-fit:cover;border-radius:16px;background:#000;display:block;margin:0 auto;box-shadow:0 12px 40px rgba(0,0,0,.18)}
-.card{background:#fff;border:1px solid #e3d6c3;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.04)}.drop{display:flex;align-items:center;gap:14px;border:2px dashed #d6bf9f;border-radius:12px;padding:16px;cursor:pointer;background:#fffaf3;min-height:96px}.drop:hover{border-color:#b0652a}.drop-text{display:flex;flex-direction:column}.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}#preview{width:72px;height:72px;object-fit:cover;border-radius:10px}.consent{display:flex;gap:8px;align-items:flex-start;font-size:.92rem;margin:12px 0}.consent input{margin-top:5px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:.6rem 0}#result video{width:100%;max-width:300px;border-radius:12px;background:#000;display:block;margin-top:8px}.msg{min-height:1.2em;margin:.4rem 0}.msg.error{color:#a3201b}.msg.ok{color:#1d6b2f}.small{font-size:.88rem}.muted{color:#6b5e50}.history{margin-top:10px;border-top:1px solid #eee;padding-top:8px}.history ul{margin:.4rem 0;padding-left:1.1rem;font-size:.9rem}
-section{padding:56px 0}.band{background:#f3eadc}.packs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:920px;margin:28px auto 0}.pack{position:relative;background:#fff;border:1px solid #e3d6c3;border-radius:16px;padding:24px;display:flex;flex-direction:column}.pack h3{margin:0;font-size:1.05rem}.pack p{margin:.2rem 0}.pack ul{padding-left:1.1rem;margin:.8rem 0 1.2rem;flex:1;color:#3b3229}.pack.pop{border:2px solid #b0652a;box-shadow:0 10px 30px rgba(176,101,42,.15)}.badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#b0652a;color:#fff;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}.price{font-size:2rem;font-weight:800}
-.steps{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s;margin:24px 0}.steps li{counter-increment:s;background:#fff;border:1px solid #e3d6c3;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:6px}.steps li::before{content:counter(s);display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#1f1b16;color:#fff;font-weight:700}.steps span{color:#3b3229;font-size:.95rem}
-.guide-list{columns:2;padding-left:1.1rem}.faq-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr);gap:40px}details{border-bottom:1px solid #e3d6c3;padding:.8rem 0}summary{font-weight:600;cursor:pointer}details p{margin:.5rem 0 0;color:#3b3229}
-.cta{background:#1f1b16;color:#fff;text-align:center}.cta p{color:#d9cdbd}
-.site-footer{background:#15110d;color:#cfc3b3;padding:44px 0 24px;font-size:.92rem}.site-footer a{color:#e9dccb;text-decoration:none}.site-footer a:hover{text-decoration:underline}.site-footer .logo{color:#fff}.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:24px;margin-bottom:20px}.foot-grid h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:#fff;margin:0 0 .6rem}.foot-grid div>a:not(.logo){display:block;margin:.3rem 0}.site-footer .disc{background:transparent;border:1px solid #3a3129;color:#cfc3b3}
-.disc{background:#fff3d6;border:1px solid #e8c77a;padding:10px 14px;border-radius:10px;font-size:.9rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px}
-.modal{border:0;border-radius:16px;padding:24px;width:min(420px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.3)}.modal::backdrop{background:rgba(20,15,10,.55)}.modal h2{margin:0 0 .2rem;font-size:1.4rem}.modal-x{position:absolute;right:12px;top:8px}.modal-x button{background:none;border:0;font-size:1.6rem;cursor:pointer;color:#6b5e50}.tabs{display:flex;background:#f3eadc;border-radius:10px;padding:4px;margin:12px 0}.tabs button{flex:1;border:0;background:none;padding:8px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;color:#6b5e50}.tabs button.on{background:#fff;color:#1f1b16;box-shadow:0 1px 3px rgba(0,0,0,.1)}.auth-form label{display:block;margin:.5rem 0;font-size:.92rem;font-weight:600}.auth-form input{width:100%;padding:10px;border:1px solid #d6c9b6;border-radius:10px;font:inherit;margin-top:4px}.auth-form .btn{margin-top:10px}
-@media(max-width:900px){.main-nav{display:none;position:absolute;top:64px;left:0;right:0;background:#fbf7f0;flex-direction:column;gap:0;padding:8px 20px 16px;border-bottom:1px solid #eadfce}.main-nav.open{display:flex}.main-nav a{padding:10px 0;border-bottom:1px solid #f0e6d8}.burger{display:flex}.hdr{justify-content:space-between}.hdr-right{margin-left:auto}}
-@media(max-width:760px){h1{font-size:1.7rem}h2{font-size:1.4rem}.hero{padding:20px 0 32px}.hero-grid,.packs,.steps,.faq-grid{grid-template-columns:1fr}.hero-side video{max-width:260px}.packs{gap:22px}.foot-grid{grid-template-columns:1fr 1fr}.guide-list{columns:1}section{padding:40px 0}.hide-xs{display:none}.credit-pill{padding:4px 9px;font-size:.8rem}}
-"""
-open(f"{OUT}/style.css","w").write(CSS)
+
 pages=[]
 def page(path,title,desc,body,ld=None,extra_head="",cls="",index=True):
     url=D+path
@@ -81,54 +73,84 @@ faq_html="".join(f"<h3>{html.escape(q)}</h3><p>{html.escape(a)}</p>" for q,a in 
 faq_ld={"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":q,"acceptedAnswer":{"@type":"Answer","text":a}} for q,a in faq]}
 web_ld={"@context":"https://schema.org","@type":"WebSite","name":"Tiny Desk Trend","url":D+"/"}
 GUIDES_LIST=[("/guides/what-is-the-tiny-desk-ai-trend/","Where the Tiny Desk AI trend came from"),("/guides/how-to-make-outstanding-tiny-desk-ai-video/","How the Outstanding Tiny Desk AI video is made"),("/guides/outstanding-tiny-desk-song/","What is the song?"),("/guides/tiny-desk-ai-video-generator/","Tiny Desk AI video generator: what to check"),("/guides/outstanding-tiny-desk-ai-template/","The Outstanding template: shots and roles"),("/guides/outstanding-tiny-desk-meme-ideas/","Meme meaning and casting ideas"),("/guides/outstanding-gap-band-song-facts/","\"Outstanding\" by The Gap Band: facts")]
+CASTING=[("Your team after a loss","Where the trend started: coaches of teams that just lost, belting a song called “Outstanding”."),
+("The coworker who missed the deadline","Put them front and centre for the big laugh."),
+("Last place in the fantasy league","Losers sing lead. League rules."),
+("The group chat’s worst week","Whoever had it gets the close-up."),
+("You","Your own outstanding week, on lead.")]
+MARQUEE=["Put your face on lead","One photo","13 seconds","Vertical 9:16","Song + silent copy","Credits back if it fails","Unofficial fan tool"]
+def pack(key,name,price,credits,videos,pop=False):
+    badge='<span class="badge">Most popular</span>' if pop else ""
+    cls="pack pop" if pop else "pack"
+    btn="btn full buy" if pop else "btn ghost full buy"
+    feats="".join(f"<li>{I_CHECK}{t}</li>" for t in ("13 s lead-singer clip","Song + silent versions","480p, vertical 9:16"))
+    return (f'<div class="{cls}">{badge}<div class="ticket"><div class="pack-face"><h3>{name}</h3><p class="price">{price}</p></div>'
+            f'<div class="pack-stub"><p class="credits">{credits} credits <span>= {videos} videos</span></p><ul>{feats}</ul>'
+            f'<button type="button" class="{btn}" data-pack="{key}">Buy {name}</button></div></div></div>')
 HOME=f"""
-<section class="hero" id="create"><div class="wrap hero-grid">
- <div class="hero-main">
-  <p class="eyebrow">Unofficial Tiny Desk AI video generator</p>
-  <h1>Put your face in the "Outstanding" Tiny Desk video</h1>
+<section class="hero" id="create"><div class="wrap">
+ <div class="hero-head">
+  <h1 class="hero-title">Put your face in the <span class="hl">“Outstanding”</span> Tiny Desk video</h1>
   <p class="lead">Upload one photo and get the 13-second lead-singer clip, recast with you. Vertical 9:16, with the song and a silent copy.</p>
+  <div class="hero-facts"><span class="pill sun">13 s · 9:16 · 480p</span><span class="pill">Song + silent copy</span><span class="pill mint">Credits back if it fails</span></div>
+ </div>
+</div>
+ <div class="stage"><div class="wrap stage-inner">
   <div class="card gen" id="account">
+   <h2>Cast yourself on lead</h2>
    <label class="drop" id="drop"><input id="photo" class="vh" type="file" accept="image/jpeg,image/png,image/webp">
-    <img id="preview" alt="Your photo preview" hidden>
+    <span class="preview-wrap"><img id="preview" alt="Your photo preview" hidden><span class="preview-tag">Now on lead</span></span><span class="drop-icon">{I_UP}</span>
     <span class="drop-text" id="drop-text"><b>Choose a photo</b><span class="small muted">JPEG, PNG or WebP, up to 10 MB. One clear, front-facing face.</span></span></label>
    <p id="photo-msg" class="msg small"></p>
+   <a href="#sample" class="see-sample small" id="see-sample" hidden>See yourself on the sample</a>
    <label class="consent"><input id="consent" type="checkbox"> This photo is of me, or of someone who has given me permission to use it. No minors.</label>
    <p id="sold-out" class="msg error" hidden>Sold out for now. Please check back soon.</p>
-   <button type="button" id="generate" class="btn big full" disabled>Generate my video · 100 credits</button>
+   <button type="button" id="generate" class="btn big full" disabled>Generate · 100 credits</button>
    <p id="gen-hint" class="small muted center"></p>
    <p id="gen-status" class="msg"></p>
    <div id="result" hidden>
     <video id="result-video" controls playsinline></video>
     <div class="row"><a id="dl-song" class="btn" download="tiny-desk-ai-with-song.mp4" hidden>Download with song</a><a id="dl-silent" class="btn ghost" download="tiny-desk-ai-silent.mp4" hidden>Download silent</a><a id="dl-raw" class="link small" download="tiny-desk-ai-original.mp4">Original file</a></div>
    </div>
-   <p class="meta center">1 photo · 13 seconds · 9:16 · from $9.99 · <a href="#pricing">See pricing</a></p>
+   <ul class="gen-facts"><li>1 photo</li><li>About 2 minutes</li><li>From $9.99</li><li><a href="#pricing">See pricing</a></li></ul>
    <details id="videos" class="history" hidden><summary>My videos <span class="muted small">(kept 7 days)</span></summary><ul id="history"></ul></details>
   </div>
- </div>
- <aside class="hero-side">
-  <video src="/media/sample.mp4" poster="/media/sample.jpg" controls muted playsinline loop preload="none"></video>
-  <p class="small muted center">Sample output · 13 s · 480p · AI results vary</p>
- </aside>
+  <figure class="sample" id="sample">
+   <div class="phone">
+    <video src="/media/sample.mp4" poster="/media/sample.jpg" muted playsinline loop preload="metadata" aria-label="Sample output video"></video>
+    <div class="phone-ctrl"><button type="button" class="sound" id="sample-play" aria-pressed="false" aria-label="Pause sample">{I_PAUSE}{I_PLAY}</button><button type="button" class="sound" id="sample-sound" aria-pressed="false">{I_SOUND}<span>Sound on</span></button></div>
+    <span class="sticker" id="lead-tag">{I_STAR}Your face goes here</span>
+    <span class="cast" id="cast"><img id="cast-img" alt="Your photo, cast on lead"></span><span class="cast-label">Now on lead</span>
+   </div>
+   <figcaption>Sample output · 13 s · 480p · AI results vary<br>Unofficial fan tool, not affiliated with NPR</figcaption>
+  </figure>
+ </div></div>
+</section>
+<div class="marquee" aria-hidden="true"><div class="marquee-track">{"".join(f"<span>{t}</span>" for t in MARQUEE*2)}</div></div>
+<section id="ideas"><div class="wrap">
+<div class="sec-head"><h2>Who’s singing lead this week?</h2><p>One photo puts one person on lead. The joke is who you pick.</p></div>
+<ul class="casting">{"".join(f"<li><b>{html.escape(a)}</b><span>{html.escape(b)}</span></li>" for a,b in CASTING)}</ul>
+<p class="casting-more"><a href="/guides/outstanding-tiny-desk-meme-ideas/">More casting ideas and how the meme works</a></p>
 </div></section>
-<section id="pricing" class="band"><div class="wrap">
-<p class="eyebrow center">Pricing</p><h2 class="center">Simple credit packs</h2><p class="muted center">One-time payments, no subscription. 100 credits = one 13-second 480p video. Secure checkout by Stripe.</p>
-<div class="packs">
-<div class="pack"><h3>Starter</h3><p class="price">$9.99</p><p>300 credits</p><ul><li>3 videos</li><li>Song + silent versions</li><li>480p, 9:16</li></ul><button type="button" class="btn ghost full buy" data-pack="starter">Buy Starter</button></div>
-<div class="pack pop"><span class="badge">Most popular</span><h3>Plus</h3><p class="price">$19.99</p><p>700 credits</p><ul><li>7 videos</li><li>Song + silent versions</li><li>480p, 9:16</li></ul><button type="button" class="btn full buy" data-pack="plus">Buy Plus</button></div>
-<div class="pack"><h3>Pro</h3><p class="price">$49.99</p><p>1,800 credits</p><ul><li>18 videos</li><li>Song + silent versions</li><li>480p, 9:16</li></ul><button type="button" class="btn ghost full buy" data-pack="pro">Buy Pro</button></div>
-</div><p id="buy-msg" class="msg center"></p><p class="small muted center">Credits are returned automatically if a video fails.</p></div></section>
-<section id="how-it-works"><div class="wrap">
-<p class="eyebrow center">How it works</p><h2 class="center">Three steps</h2><ol class="steps">
-<li><b>Upload a clear portrait</b><span>Your browser checks for a face first. Confirm the photo is yours or that you have permission.</span></li>
-<li><b>Generate</b><span>100 credits are used and the AI recasts the lead singer. It usually takes about 2 minutes. If it fails, the credits come back.</span></li>
-<li><b>Download</b><span>Your browser trims the clip to 13 seconds and gives you a version with the song and a silent copy.</span></li></ol>
-<p class="center"><a class="btn" href="#create">Add your photo</a></p></div></section>
-<section id="about" class="band"><div class="wrap narrow">
-<h2>What is Tiny Desk AI?</h2>
-<p>The <strong>Tiny Desk AI trend</strong> takes the end of Charlie Wilson's 2023 NPR Tiny Desk concert, where he closes with The Gap Band's "Outstanding", and uses AI to put new people in it. It went viral on TikTok in October 2026 with a parody starring college football coaches whose teams had just lost.</p>
-<ul class="guide-list">{"".join(f'<li><a href="{u}">{html.escape(t)}</a></li>' for u,t in GUIDES_LIST)}</ul></div></section>
-<section id="faq"><div class="wrap faq-grid"><div><p class="eyebrow">FAQ</p><h2>Questions, answered</h2><p class="muted">More in the <a href="/faq/">full FAQ</a>.</p></div>
-<div>{"".join(f"<details><summary>{html.escape(q)}</summary><p>{html.escape(a)}</p></details>" for q,a in faq)}</div></div></section>
+<section id="how-it-works" class="band"><div class="wrap setlist-wrap">
+<div><h2>Tonight’s set list</h2><p class="lead">Three steps from photo to post. Most videos are ready in about two minutes.</p><p><a class="btn" href="#create">Add your photo</a></p></div>
+<ol class="setlist">
+<li><b>Upload a clear portrait</b><span>Your browser checks for a face before anything is uploaded. Confirm the photo is yours or that you have permission.</span></li>
+<li><b>Generate</b><span>100 credits are used and the AI recasts the lead singer. If it fails, the credits come back.</span></li>
+<li><b>Download</b><span>Your browser trims the clip to 13 seconds and hands you a version with the song and a silent copy.</span></li></ol>
+</div></section>
+<section id="pricing"><div class="wrap">
+<div class="sec-head center"><h2 class="center">Credit packs</h2><p class="center">One-time payments, no subscription. 100 credits make one 13-second 480p video. Secure checkout by Stripe.</p></div>
+<div class="packs">{pack("starter","Starter","$9.99","300",3)}{pack("plus","Plus","$19.99","700",7,True)}{pack("pro","Pro","$49.99","1,800",18)}</div>
+<p id="buy-msg" class="msg center"></p><p class="pack-note center">Credits are returned automatically if a video fails.</p></div></section>
+<section id="about" class="band"><div class="wrap about-grid">
+<div><h2>What is Tiny Desk AI?</h2>
+<p>The <strong>Tiny Desk AI trend</strong> takes the end of Charlie Wilson’s 2023 NPR Tiny Desk concert, where he closes with The Gap Band’s “Outstanding”, and uses AI to put new people in it. It went viral on TikTok in October 2026 with a parody starring college football coaches whose teams had just lost.</p>
+{DISC}</div>
+<ul class="guide-links">{"".join(f'<li><a href="{u}"><span>{html.escape(t)}</span>{I_ARROW}</a></li>' for u,t in GUIDES_LIST)}</ul>
+</div></section>
+<section id="faq"><div class="wrap faq-grid"><div><h2>Questions, answered</h2><p class="muted">More in the <a href="/faq/">full FAQ</a>.</p></div>
+<div class="faq-list">{"".join(f"<details><summary>{html.escape(q)}</summary><p>{html.escape(a)}</p></details>" for q,a in faq)}</div></div></section>
 <section class="cta"><div class="wrap"><h2>Your lead-singer moment starts here</h2><p>One photo, about two minutes.</p><a class="btn big" href="#create">Add your photo</a></div></section>
 """
 page("/","Tiny Desk AI – Make Your Own Outstanding Tiny Desk AI Video",
@@ -285,21 +307,28 @@ open(f"{OUT}/llms.txt","w").write(f"""# Tiny Desk Trend (tinydesktrend.com)
 - [Privacy]({D}/privacy/)
 - [Terms]({D}/terms/)
 """)
-# IndexNow key
-kp="/workspace/secrets/indexnow-tinydesktrend.txt"
+# IndexNow key (kept outside the repo; secrets/ is gitignored)
+kp=os.environ.get("INDEXNOW_KEY_FILE") or ("/workspace/secrets/indexnow-tinydesktrend.txt" if os.path.isdir("/workspace/secrets") else "secrets/indexnow-tinydesktrend.txt")
 if not os.path.exists(kp):
-    open(kp,"w").write(secrets.token_hex(16)); os.chmod(kp,0o600)
+    os.makedirs(os.path.dirname(kp),exist_ok=True); open(kp,"w").write(secrets.token_hex(16)); os.chmod(kp,0o600)
 key=open(kp).read().strip(); open(f"{OUT}/{key}.txt","w").write(key)
-# images
+# images: og.png ships from static/ unless the DejaVu fonts are present to redraw it
+from PIL import Image, ImageDraw, ImageFont
 B="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"; R="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-im=Image.new("RGB",(1200,630),"#2a1a10"); d=ImageDraw.Draw(im)
-d.rectangle([0,560,1200,630],fill="#b0652a")
-d.text((80,150),"Tiny Desk AI",font=ImageFont.truetype(B,110),fill="#ffd27a")
-d.text((80,300),"The \u201cOutstanding\u201d Tiny Desk AI video trend",font=ImageFont.truetype(R,46),fill="#fbf7f0")
-d.text((80,380),"Origin \u00b7 the song \u00b7 how it's made",font=ImageFont.truetype(R,40),fill="#e6d2b5")
-d.text((80,575),"tinydesktrend.com  \u00b7  unofficial fan site",font=ImageFont.truetype(R,32),fill="#fff")
-im.save(f"{OUT}/og.png")
-fi=Image.new("RGBA",(64,64),(0,0,0,0)); fd=ImageDraw.Draw(fi); fd.rounded_rectangle([0,0,63,63],12,fill="#b0652a"); fd.text((10,8),"TD",font=ImageFont.truetype(B,34),fill="#fff")
+if os.path.exists(B) and os.path.exists(R):
+    im=Image.new("RGB",(1200,630),"#2a1a10"); d=ImageDraw.Draw(im)
+    d.rectangle([0,560,1200,630],fill="#b0652a")
+    d.text((80,150),"Tiny Desk AI",font=ImageFont.truetype(B,110),fill="#ffd27a")
+    d.text((80,300),"The “Outstanding” Tiny Desk AI video trend",font=ImageFont.truetype(R,46),fill="#fbf7f0")
+    d.text((80,380),"Origin · the song · how it's made",font=ImageFont.truetype(R,40),fill="#e6d2b5")
+    d.text((80,575),"tinydesktrend.com  ·  unofficial fan site",font=ImageFont.truetype(R,32),fill="#fff")
+    im.save(f"{OUT}/og.png")
+# favicon: microphone on a sun-yellow tile, matching the header mark
+S=256; fi=Image.new("RGBA",(S,S),(0,0,0,0)); fd=ImageDraw.Draw(fi); INK=(42,30,22,255)
+fd.rounded_rectangle([8,8,S-9,S-9],56,fill=(250,214,72,255),outline=INK,width=16)
+fd.rounded_rectangle([100,52,156,150],28,outline=INK,width=18)
+fd.arc([70,86,186,180],0,180,fill=INK,width=18)
+fd.line([128,180,128,206],fill=INK,width=18); fd.line([98,206,158,206],fill=INK,width=18)
 fi.save(f"{OUT}/favicon.ico",sizes=[(16,16),(32,32),(48,48),(64,64)])
-open(f"{OUT}/favicon.svg","w").write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#b0652a"/><text x="32" y="43" font-family="Arial,sans-serif" font-weight="bold" font-size="30" fill="#fff" text-anchor="middle">TD</text></svg>')
+open(f"{OUT}/favicon.svg","w").write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="14" fill="#fad648" stroke="#2a1e16" stroke-width="4"/><g fill="none" stroke="#2a1e16" stroke-width="4.5" stroke-linecap="round"><rect x="25" y="13" width="14" height="24" rx="7"/><path d="M18 30a14 14 0 0 0 28 0M32 44v7M25 51h14"/></g></svg>')
 print(pages)

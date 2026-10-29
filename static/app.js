@@ -48,9 +48,19 @@ async function getDetector() {
   });
   return detector;
 }
+// Pin the accepted photo onto the sample as a "now on lead" sticker.
+function castOnLead(src) {
+  const cast = $('#cast');
+  if (!cast) return;
+  if (src) $('#cast-img').src = src;
+  cast.classList.toggle('on', !!src);
+  $('#lead-tag').classList.toggle('peeled', !!src);
+  $('#drop').classList.toggle('cast-on', !!src);
+  $('#see-sample').hidden = !src;
+}
 async function checkPhoto(file) {
   const m = $('#photo-msg');
-  photoOk = false; updateGenerate();
+  photoOk = false; updateGenerate(); castOnLead(null);
   if (!file) return;
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
     msg(m, 'Use a JPEG, PNG or WebP photo up to 10 MB.', 'error'); return;
@@ -67,6 +77,7 @@ async function checkPhoto(file) {
     if (!faces.length) { msg(m, 'No face found. Use a clear, front-facing photo of one person.', 'error'); return; }
     const w = faces.map((f) => f.boundingBox.width).sort((a, b) => b - a);
     photoOk = true;
+    castOnLead(img.src);
     msg(m, w.length > 1 && w[1] >= w[0] / 2 ? 'Face found. Tip: one person per photo works best.' : 'Face found. Looks good.', 'ok');
   } catch (e) {
     msg(m, 'Face check could not run in this browser. Try another browser.', 'error');
@@ -178,6 +189,24 @@ async function buy(pack) {
 
 function openVideos() { const d = $('#videos'); if (!d.hidden) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
 document.addEventListener('DOMContentLoaded', () => {
+  // Sample video: autoplay unless the visitor prefers reduced motion; authored play/pause and sound stickers.
+  const v = $('.phone video'), play = $('#sample-play'), sound = $('#sample-sound');
+  const showPlaying = (on) => {
+    play.classList.toggle('paused', !on);
+    play.setAttribute('aria-pressed', String(!on));
+    play.setAttribute('aria-label', on ? 'Pause sample' : 'Play sample');
+  };
+  v.addEventListener('play', () => showPlaying(true));
+  v.addEventListener('pause', () => showPlaying(false));
+  showPlaying(false);
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) v.play().catch(() => {});
+  play.onclick = () => (v.paused ? v.play().catch(() => {}) : v.pause());
+  sound.onclick = () => {
+    v.muted = !v.muted;
+    if (!v.muted) v.play().catch(() => {});
+    sound.setAttribute('aria-pressed', String(!v.muted));
+    sound.querySelector('span').textContent = v.muted ? 'Sound on' : 'Sound off';
+  };
   $('#photo').onchange = (e) => checkPhoto(e.target.files[0]);
   $('#consent').onchange = updateGenerate;
   $('#generate').onclick = onGenerate;

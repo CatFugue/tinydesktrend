@@ -7,3 +7,6 @@ secrets/
 .DS_Store
 __pycache__/
 public/
+.claude/
+.impeccable/review/
+.impeccable/live/

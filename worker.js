@@ -209,6 +209,78 @@ async function putSecret(env, name, value) {
 }
 
 // ---------- Stripe ----------
+async function stripeGet(env, path) {
+  const key = await getSecret(env, 'STRIPE_SECRET_KEY');
+  if (!key) throw new Error('stripe_not_configured');
+  const r = await fetch(`https://api.stripe.com/v1${path}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}`, 'Stripe-Version': STRIPE_VERSION },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const e = new Error(`stripe_http_${r.status}`);
+    e.status = r.status;
+    e.code = data.error?.code || data.error?.type;
+    throw e;
+  }
+  return data;
+}
+
+async function anomaly(env, kind, orderId, detail) {
+  await env.DB.prepare('INSERT INTO payment_anomalies(order_id, kind, detail, created_at) VALUES(?,?,?,?)')
+    .bind(orderId, kind, JSON.stringify(detail || {}), now()).run();
+  console.error(JSON.stringify({ event: 'payment_anomaly', kind, orderId, detail }));
+}
+
+async function settleOrder(env, order, session, via) {
+  const t = now();
+  const paymentIntent = session.payment_intent || null;
+  const amountPaid = typeof session.amount_total === 'number' ? session.amount_total : null;
+  const currency = String(session.currency || '').toLowerCase();
+  const paymentStatus = session.payment_status;
+
+  // Validate amount and currency
+  if (paymentStatus !== 'paid' || currency !== 'usd' || amountPaid === null || amountPaid < order.cents) {
+    await anomaly(env, 'amount_mismatch', order.id, {
+      expected: order.cents,
+      got: amountPaid,
+      currency,
+      session: session.id,
+      payment_status: paymentStatus,
+    });
+    return { settled: false, reason: 'amount_mismatch' };
+  }
+
+  // Atomic settlement: update order status, grant credits, record funnel event
+  const batch = [
+    env.DB.prepare(
+      "UPDATE orders SET status='paid', payment_intent=?, amount_paid=?, settled_via=?, updated_at=? WHERE id=? AND status IN ('pending','failed','expired')"
+    ).bind(paymentIntent, amountPaid, via, t, order.id),
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO credit_ledger(user_id, delta, kind, reference, note, created_at) SELECT user_id, credits, 'purchase', id, pack_id, ? FROM orders WHERE id=? AND status='paid'"
+    ).bind(t, order.id),
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO funnel_events(event, user_id, reference, created_at) VALUES('paid', ?, ?, ?)"
+    ).bind(order.user_id, order.id, t),
+  ];
+
+  const results = await env.DB.batch(batch);
+  const orderUpdated = results[0].meta.changes > 0;
+  const creditsGranted = results[1].meta.changes > 0;
+
+  if (orderUpdated && creditsGranted) {
+    console.log(JSON.stringify({ event: 'order_settled', order: order.id, via, amount: amountPaid }));
+    return { settled: true, reason: 'settled' };
+  }
+  if (orderUpdated && !creditsGranted) {
+    // Order was settled but credits already existed (shouldn't happen with UNIQUE constraint)
+    console.error(JSON.stringify({ event: 'settle_credit_conflict', order: order.id, via }));
+    return { settled: true, reason: 'already_credited' };
+  }
+  // Order was already settled by another path
+  return { settled: false, reason: 'already_settled' };
+}
+
 async function checkout(req, env) {
   const user = await currentUser(req, env);
   if (!user) return err(401, 'Log in or create an account first.');
@@ -226,7 +298,7 @@ async function checkout(req, env) {
   const body = new URLSearchParams();
   body.set('mode', 'payment');
   body.set('client_reference_id', orderId);
-  body.set('success_url', 'https://tinydesktrend.com/?paid=1#create');
+  body.set('success_url', 'https://tinydesktrend.com/api/stripe/return?session_id={CHECKOUT_SESSION_ID}');
   body.set('cancel_url', 'https://tinydesktrend.com/?canceled=1#pricing');
   body.set('line_items[0][price]', price);
   body.set('line_items[0][quantity]', '1');
@@ -247,13 +319,41 @@ async function checkout(req, env) {
   });
   const s = await r.json().catch(() => ({}));
   if (r.status !== 200 || typeof s.url !== 'string' || !s.url.startsWith('https://checkout.stripe.com/')) {
-    console.error(JSON.stringify({ event: 'stripe_checkout_failed', status: r.status, code: s.error?.code }));
-    return json({ error: 'Could not open checkout. Please try again.', code: s.error?.code || s.error?.type || r.status, detail: String(s.error?.message || '').slice(0, 160) }, 502);
+    const errorCode = s.error?.code || s.error?.type || String(r.status);
+    const errorMsg = String(s.error?.message || '').slice(0, 300);
+    console.error(JSON.stringify({ event: 'stripe_checkout_failed', status: r.status, code: errorCode, msg: errorMsg, order: orderId }));
+    await env.DB.prepare("UPDATE orders SET status='failed', error=?, updated_at=? WHERE id=? AND status='pending'")
+      .bind(`${errorCode}: ${errorMsg}`, now(), orderId).run();
+    return json({ error: 'Could not open checkout. Please try again.', ref: orderId }, 502);
   }
   await env.DB.prepare('UPDATE orders SET session_id = ?, updated_at = ? WHERE id = ?').bind(s.id, now(), orderId).run();
   await funnel(env, 'checkout_opened', user.id, orderId);
   return json({ url: s.url });
 }
+
+async function stripeReturn(req, env) {
+  const u = new URL(req.url);
+  const sessionId = u.searchParams.get('session_id');
+  if (!sessionId || !/^cs_(live|test)_[A-Za-z0-9]+$/.test(sessionId)) {
+    return Response.redirect('https://tinydesktrend.com/?paid=pending#create', 302);
+  }
+  if (await limited(env, `stripe_return:${ip(req)}`, 30, 600)) {
+    return Response.redirect('https://tinydesktrend.com/?paid=pending#create', 302);
+  }
+  try {
+    const session = await stripeGet(env, `/checkout/sessions/${sessionId}`);
+    const orderId = session.client_reference_id || session.metadata?.order_id;
+    if (!orderId) return Response.redirect('https://tinydesktrend.com/?paid=pending#create', 302);
+    const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
+    if (!order) return Response.redirect('https://tinydesktrend.com/?paid=pending#create', 302);
+    const result = await settleOrder(env, order, session, 'return');
+    return Response.redirect(`https://tinydesktrend.com/?paid=${result.settled ? '1' : 'pending'}#create`, 302);
+  } catch (e) {
+    console.error(JSON.stringify({ event: 'stripe_return_failed', msg: String(e?.message || e).slice(0, 200) }));
+    return Response.redirect('https://tinydesktrend.com/?paid=pending#create', 302);
+  }
+}
+
 async function verifyStripe(body, header, secret) {
   if (!secret || !header) return false;
   let t = '';
@@ -272,6 +372,7 @@ async function verifyStripe(body, header, secret) {
   for (const s of sigs) if (await safeEqual(s, expected)) ok = true;
   return ok;
 }
+
 async function webhook(req, env) {
   const body = await req.text();
   if (!(await verifyStripe(body, req.headers.get('Stripe-Signature'), await getSecret(env, 'STRIPE_WEBHOOK_SECRET')))) return err(400, 'Invalid signature.');
@@ -279,42 +380,188 @@ async function webhook(req, env) {
   try { ev = JSON.parse(body); } catch { return err(400, 'Invalid event.'); }
   const obj = ev?.data?.object || {};
   const meta = obj.metadata || {};
-  if (meta.site !== SITE) return json({ received: true, ignored: true }); // other sites on the same Stripe account
-  const orderId = meta.order_id || obj.client_reference_id;
-  const order = orderId ? await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first() : null;
-  const payEvent = ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded' || ev.type === 'charge.refunded';
+  
+  // Find order: try metadata first, then client_reference_id, then payment_intent
+  let orderId = meta.order_id || obj.client_reference_id;
+  let order = orderId ? await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first() : null;
+  
+  // For dispute events, try payment_intent lookup
+  if (!order && obj.payment_intent) {
+    order = await env.DB.prepare('SELECT * FROM orders WHERE payment_intent = ?').bind(obj.payment_intent).first();
+    if (order) orderId = order.id;
+  }
+  
+  // Site check: metadata match OR order found via payment_intent
+  if (meta.site !== SITE && !order) return json({ received: true, ignored: true });
+  
+  const payEvent = ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded' || ev.type === 'charge.refunded' || ev.type === 'charge.dispute.created' || ev.type === 'charge.dispute.closed';
   if (!order) return payEvent ? err(500, 'Order not found yet.') : json({ received: true, ignored: true });
+  
   const seen = await env.DB.prepare('SELECT id FROM payment_events WHERE id = ?').bind(ev.id).first();
   if (seen) return json({ received: true, duplicate: true });
   const record = env.DB.prepare('INSERT OR IGNORE INTO payment_events(id, order_id, type, created_at) VALUES(?,?,?,?)').bind(ev.id, order.id, ev.type, now());
   const t = now();
+  
   if (ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded') {
     if (obj.payment_status !== 'paid') { await record.run(); return json({ received: true }); }
-    if (String(obj.currency).toLowerCase() !== 'usd' || typeof obj.amount_total !== 'number' || obj.amount_total < order.cents ||
-        meta.user_id !== order.user_id || meta.credits !== String(order.credits)) {
-      console.error(JSON.stringify({ event: 'stripe_mismatch', id: ev.id, order: order.id }));
-      return err(500, 'Order mismatch.');
-    }
+    await record.run();
+    await settleOrder(env, order, obj, 'webhook');
+  } else if (ev.type === 'checkout.session.async_payment_failed') {
     await env.DB.batch([
       record,
-      env.DB.prepare("UPDATE orders SET status='paid', updated_at=? WHERE id=? AND status='pending'").bind(t, order.id),
-      env.DB.prepare("INSERT OR IGNORE INTO credit_ledger(user_id, delta, kind, reference, note, created_at) SELECT user_id, credits, 'purchase', id, pack_id, ? FROM orders WHERE id=? AND status='paid'").bind(t, order.id),
-      env.DB.prepare("INSERT INTO funnel_events(event, user_id, reference, created_at) VALUES('paid', ?, ?, ?)").bind(order.user_id, order.id, t),
+      env.DB.prepare("UPDATE orders SET status='failed', updated_at=? WHERE id=? AND status='pending'").bind(t, order.id),
     ]);
   } else if (ev.type === 'charge.refunded') {
-    const full = obj.refunded === true || (obj.amount > 0 && obj.amount_refunded >= obj.amount);
-    if (!full) { await record.run(); return json({ received: true }); }
-    await env.DB.batch([
-      record,
-      env.DB.prepare("UPDATE orders SET status='refunded', updated_at=? WHERE id=? AND status='paid'").bind(t, order.id),
-      env.DB.prepare("INSERT OR IGNORE INTO credit_ledger(user_id, delta, kind, reference, note, created_at) SELECT user_id, -credits, 'refund_clawback', id, 'stripe full refund', ? FROM orders WHERE id=? AND status='refunded'").bind(t, order.id),
-    ]);
+    await record.run();
+    await handleRefund(env, order, obj);
+  } else if (ev.type === 'charge.dispute.created') {
+    await record.run();
+    await handleDisputeCreated(env, order, obj);
+  } else if (ev.type === 'charge.dispute.closed') {
+    await record.run();
+    await handleDisputeClosed(env, order, obj);
   } else if (ev.type === 'checkout.session.expired') {
     await env.DB.batch([record, env.DB.prepare("UPDATE orders SET status='expired', updated_at=? WHERE id=? AND status='pending'").bind(t, order.id)]);
   } else {
     await record.run();
   }
   return json({ received: true });
+}
+
+async function handleRefund(env, order, charge) {
+  const t = now();
+  const amountRefunded = charge.amount_refunded || 0;
+  const amountPaid = order.amount_paid || charge.amount || 0;
+  const newRefundDelta = amountRefunded - (order.refunded_cents || 0);
+  
+  if (newRefundDelta <= 0) return; // No new refund
+  
+  const isFullRefund = amountRefunded >= amountPaid;
+  const newStatus = isFullRefund ? 'refunded' : 'partially_refunded';
+  
+  // Calculate credits to claw back (proportional)
+  const targetClawback = Math.floor(order.credits * amountRefunded / amountPaid);
+  const alreadyClawed = await env.DB.prepare(
+    "SELECT COALESCE(SUM(-delta), 0) AS clawed FROM credit_ledger WHERE user_id = ? AND kind = 'refund_clawback' AND reference LIKE ?"
+  ).bind(order.user_id, `${order.id}:%`).first();
+  const toClaw = Math.max(0, targetClawback - alreadyClawed.clawed);
+  
+  // Get current balance
+  const currentBalance = await balance(env, order.user_id);
+  const actualClaw = Math.min(toClaw, Math.max(0, currentBalance));
+  
+  const batch = [
+    env.DB.prepare("UPDATE orders SET status=?, refunded_cents=?, updated_at=? WHERE id=?").bind(newStatus, amountRefunded, t, order.id),
+  ];
+  
+  if (actualClaw > 0) {
+    batch.push(env.DB.prepare(
+      "INSERT OR IGNORE INTO credit_ledger(user_id, delta, kind, reference, note, created_at) VALUES(?,?,?,?,?,?)"
+    ).bind(order.user_id, -actualClaw, 'refund_clawback', `${order.id}:${amountRefunded}`, 'stripe refund', t));
+  }
+  
+  if (actualClaw < toClaw) {
+    await anomaly(env, 'clawback_shortfall', order.id, {
+      target: toClaw,
+      actual: actualClaw,
+      balance: currentBalance,
+      refunded: amountRefunded,
+      paid: amountPaid,
+    });
+  }
+  
+  await env.DB.batch(batch);
+}
+
+async function handleDisputeCreated(env, order, dispute) {
+  const t = now();
+  const currentBalance = await balance(env, order.user_id);
+  const holdAmount = Math.min(order.credits, Math.max(0, currentBalance));
+  
+  const batch = [
+    env.DB.prepare("UPDATE orders SET status='disputed', updated_at=? WHERE id=?").bind(t, order.id),
+  ];
+  
+  if (holdAmount > 0) {
+    batch.push(env.DB.prepare(
+      "INSERT OR IGNORE INTO credit_ledger(user_id, delta, kind, reference, note, created_at) VALUES(?,?,?,?,?,?)"
+    ).bind(order.user_id, -holdAmount, 'dispute_hold', order.id, 'dispute opened', t));
+  }
+  
+  await env.DB.batch(batch);
+  await anomaly(env, 'dispute_opened', order.id, {
+    dispute_id: dispute.id,
+    amount: dispute.amount,
+    status: dispute.status,
+    hold_amount: holdAmount,
+  });
+}
+
+async function handleDisputeClosed(env, order, dispute) {
+  const t = now();
+  const status = dispute.status;
+  
+  if (status === 'won') {
+    // Restore held credits
+    const held = await env.DB.prepare(
+      "SELECT COALESCE(SUM(-delta), 0) AS held FROM credit_ledger WHERE user_id = ? AND kind = 'dispute_hold' AND reference = ?"
+    ).bind(order.user_id, order.id).first();
+    
+    const batch = [
+      env.DB.prepare("UPDATE orders SET status='paid', updated_at=? WHERE id=?").bind(t, order.id),
+    ];
+    
+    if (held.held > 0) {
+      batch.push(env.DB.prepare(
+        "INSERT OR IGNORE INTO credit_ledger(user_id, delta, kind, reference, note, created_at) VALUES(?,?,?,?,?,?)"
+      ).bind(order.user_id, held.held, 'dispute_reversal', order.id, 'dispute won', t));
+    }
+    
+    await env.DB.batch(batch);
+  } else if (status === 'lost') {
+    await env.DB.prepare("UPDATE orders SET status='dispute_lost', updated_at=? WHERE id=?").bind(t, order.id).run();
+  }
+  
+  await anomaly(env, 'dispute_closed', order.id, {
+    dispute_id: dispute.id,
+    status,
+    amount: dispute.amount,
+  });
+}
+
+async function reconcileOrders(env) {
+  const t = now();
+  const cutoff10min = t - 600;
+  const cutoff25h = t - 90000;
+  
+  // Poll pending orders with session_id (10 min to 25 hours old)
+  const pollable = await env.DB.prepare(
+    "SELECT * FROM orders WHERE status = 'pending' AND session_id IS NOT NULL AND created_at > ? AND created_at <= ? AND (updated_at IS NULL OR updated_at < ?) ORDER BY created_at LIMIT 10"
+  ).bind(cutoff25h, cutoff10min, t - 300).all();
+  
+  for (const order of pollable.results) {
+    try {
+      const session = await stripeGet(env, `/checkout/sessions/${order.session_id}`);
+      if (session.payment_status === 'paid') {
+        await settleOrder(env, order, session, 'cron');
+      } else if (session.status === 'expired') {
+        await env.DB.prepare("UPDATE orders SET status='expired', updated_at=? WHERE id=? AND status='pending'").bind(t, order.id).run();
+      }
+      // If open, skip (will poll again later)
+    } catch (e) {
+      console.error(JSON.stringify({ event: 'reconcile_poll_failed', order: order.id, msg: String(e?.message || e).slice(0, 200) }));
+    }
+  }
+  
+  // Expire old pending orders
+  await env.DB.prepare(
+    "UPDATE orders SET status='expired', updated_at=? WHERE status='pending' AND created_at < ?"
+  ).bind(t, cutoff25h).run();
+  
+  // Fail pending orders without session_id
+  await env.DB.prepare(
+    "UPDATE orders SET status='failed', error='no_session', updated_at=? WHERE status='pending' AND session_id IS NULL AND created_at < ?"
+  ).bind(t, cutoff10min).run();
 }
 
 // ---------- MetaSo H3 ----------
@@ -529,6 +776,11 @@ async function admin(req, env, path) {
     const rows = await env.DB.prepare('SELECT event, COUNT(*) AS n FROM funnel_events GROUP BY event').all();
     return json(rows.results);
   }
+  if (path === '/api/admin/anomalies') {
+    const rows = await env.DB.prepare('SELECT * FROM payment_anomalies ORDER BY created_at DESC LIMIT 100').all();
+    const open = await env.DB.prepare('SELECT COUNT(*) AS n FROM payment_anomalies WHERE resolved = 0').first();
+    return json({ open: open.n, anomalies: rows.results });
+  }
   return err(404, 'Not found.');
 }
 
@@ -537,6 +789,7 @@ async function cron(env) {
     "SELECT * FROM jobs WHERE (status = 'processing' OR (status = 'reconcile' AND task_id IS NOT NULL AND created_at > ?)) AND (polled_at IS NULL OR polled_at < ?) ORDER BY created_at LIMIT 10",
   ).bind(now() - 86400, now() - 30).all();
   for (const j of jobs.results) await pollJob(env, j);
+  await reconcileOrders(env);
   await env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now()).run();
   await env.DB.prepare('DELETE FROM rate_limits WHERE window_start < ?').bind(now() - 86400).run();
 }
@@ -554,6 +807,7 @@ async function api(req, env, url) {
   if (p === '/api/auth/logout' && req.method === 'POST') return logout(req, env);
   if (p === '/api/checkout' && req.method === 'POST') return checkout(req, env);
   if (p === '/api/stripe/webhook' && req.method === 'POST') return webhook(req, env);
+  if (p === '/api/stripe/return' && req.method === 'GET') return stripeReturn(req, env);
   if (p === '/api/jobs' && req.method === 'POST') return createJob(req, env);
   let m = p.match(/^\/api\/jobs\/(j_[a-f0-9]{24})$/);
   if (m && req.method === 'GET') return getJob(req, env, m[1]);

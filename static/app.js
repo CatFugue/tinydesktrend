@@ -219,6 +219,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.buy').forEach((b) => (b.onclick = () => buy(b.dataset.pack)));
   document.querySelectorAll('[data-menu="videos"]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); openVideos(); }));
   const q = new URLSearchParams(location.search);
-  if (q.get('paid')) msg($('#gen-status'), 'Payment received. Credits appear in the top-right corner within a minute.', 'ok');
+  if (q.get('paid') === '1') {
+    msg($('#gen-status'), 'Payment received! Credits are in your account.', 'ok');
+    refresh();
+  } else if (q.get('paid') === 'pending') {
+    msg($('#gen-status'), 'Payment is processing. Credits will appear shortly.', 'ok');
+  }
   const t = setInterval(() => { if (cfgOf()) { clearInterval(t); if (location.hash === '#videos') openVideos(); const j = localStorage.getItem('td_job'); if (j && cfgOf().user) poll(j); } }, 200);
 });

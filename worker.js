@@ -33,7 +33,7 @@ const CSP = [
   // static.cloudflareinsights.com / cloudflareinsights.com: Cloudflare Web Analytics beacon and its reports.
   "script-src 'self' 'wasm-unsafe-eval' blob: https://static.cloudflareinsights.com",
   "worker-src 'self' blob:",
-  "connect-src 'self' https://cdn.jsdelivr.net https://cloudflareinsights.com blob: data:",
+  "connect-src 'self' https://cdn.jsdelivr.net https://cloudflareinsights.com https://static.cloudflareinsights.com blob: data:",
   "img-src 'self' data: blob:",
   "media-src 'self' blob:",
   "style-src 'self'",
@@ -183,6 +183,7 @@ const validSecret = {
   STRIPE_PRICE_PLUS: (v) => /^price_[A-Za-z0-9]{8,}$/.test(v || ''),
   STRIPE_PRICE_PRO: (v) => /^price_[A-Za-z0-9]{8,}$/.test(v || ''),
   METASO_API_KEY: (v) => (v || '').trim().length >= 20,
+  CF_WEB_ANALYTICS_TOKEN: (v) => /^[a-f0-9]{32}$/.test(v || ''),
 };
 // Encrypted KV value (cfg/<name>, set via /api/admin/secret) wins over the Worker binding, so a
 // value can be rotated without redeploying; the binding is the fallback.
@@ -562,6 +563,30 @@ async function api(req, env, url) {
   return err(404, 'Not found.');
 }
 
+
+// Cloudflare Web Analytics: Workers ASSETS responses are not auto-rewritten, so inject the official beacon.
+async function serveAsset(req, env) {
+  const r = await env.ASSETS.fetch(req);
+  if (r.status === 307 || r.status === 308) {
+    const loc = r.headers.get('Location');
+    if (loc) return Response.redirect(new URL(loc, req.url).toString(), 301);
+  }
+  const ct = r.headers.get('Content-Type') || '';
+  if (!ct.includes('text/html')) return secure(r);
+  const token = await getSecret(env, 'CF_WEB_ANALYTICS_TOKEN');
+  if (!token) return secure(r);
+  let html = await r.text();
+  if (/cloudflareinsights\.com\/beacon|data-cf-beacon/i.test(html)) return secure(new Response(html, { status: r.status, statusText: r.statusText, headers: r.headers }));
+  const snip = `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${token}"}'></script>`;
+  if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, snip + '</body>');
+  else html += snip;
+  const h = new Headers(r.headers);
+  h.delete('Content-Length');
+  const cc = h.get('Cache-Control');
+  if (cc && /no-transform/i.test(cc)) h.set('Cache-Control', cc.replace(/,?\s*no-transform/gi, '').replace(/^,\s*/, '') || 'private');
+  return secure(new Response(html, { status: r.status, statusText: r.statusText, headers: h }));
+}
+
 export default {
   async fetch(req, env) {
     const u = new URL(req.url);
@@ -578,12 +603,7 @@ export default {
         return secure(err(500, 'Something went wrong. Please try again.'));
       }
     }
-    const r = await env.ASSETS.fetch(req);
-    if (r.status === 307 || r.status === 308) {
-      const loc = r.headers.get('Location');
-      if (loc) return Response.redirect(new URL(loc, u).toString(), 301);
-    }
-    return secure(r);
+    return serveAsset(req, env);
   },
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(cron(env));

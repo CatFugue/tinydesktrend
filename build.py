@@ -391,17 +391,17 @@ page("/about/",f"About {BRAND} – Unofficial Tiny Desk AI Generator",
      f"Who runs {BRAND}, what its Tiny Desk AI generator does and does not do, how the guides are sourced and how to reach us. Not affiliated with NPR.",
      ABOUT,[{"@context":"https://schema.org","@type":"AboutPage","name":f"About {BRAND}","url":D+"/about/","mainEntity":{"@id":D+"/#org"}},org_ld],og="/og/about.png",crumb="About")
 
-page("/privacy/",f"Privacy Policy – {BRAND}","What tinydesktrend.com collects (email, login cookie, photos, videos kept 7 days, Stripe orders), who processes it and how to delete your data.",f"""<h1>Privacy Policy</h1><p><em>Last updated 2026-10-28</em></p>
+page("/privacy/",f"Privacy Policy – {BRAND}","What tinydesktrend.com collects (email, login cookie, photos, videos kept 7 days, Stripe orders), who processes it and how to delete your data.",f"""<h1>Privacy Policy</h1><p><em>Last updated 2026-11-01</em></p>
 <p>This policy covers tinydesktrend.com, an unofficial fan tool. It is not affiliated with NPR or Tiny Desk Concerts.</p>
 <h2>What we collect</h2><ul>
 <li><strong>Account:</strong> your email address and a salted hash of your password (never the password itself). We do not verify emails or send marketing.</li>
-<li><strong>Login cookie:</strong> one essential cookie (<code>td_session</code>, HttpOnly, 30 days) that keeps you signed in. No advertising or analytics cookies.</li>
+<li><strong>Login cookie:</strong> one essential cookie (<code>td_session</code>, HttpOnly, 30 days) that keeps you signed in. We do not set advertising cookies.</li>
 <li><strong>Photos you upload:</strong> sent from our server straight to the video service to make your video. We do not store your photo on our own servers. The face check before upload runs entirely in your browser.</li>
 <li><strong>Generated videos:</strong> stored for 7 days so you can download them, then deleted automatically.</li>
 <li><strong>Purchases and credits:</strong> order records (pack, amount, status) and your credit balance. Payments are handled by Stripe on its hosted checkout page; we never see or store card numbers. Stripe receives your account email, an order ID and an internal user ID.</li>
 <li><strong>Usage records:</strong> sign-up, generation, checkout and payment events, and short-lived rate-limit counters keyed by IP address, used to run the service and prevent abuse.</li></ul>
 <h2>Who processes your data</h2><ul>
-<li><strong>Cloudflare</strong> hosts the site, database and video storage, and processes request logs (IP address, browser, URL).</li>
+<li><strong>Cloudflare</strong> hosts the site, database and video storage, and processes request logs (IP address, browser, URL). We also use <strong>Cloudflare Web Analytics</strong>, a privacy-friendly, cookie-less traffic measure that does not use advertising cookies or track you across sites.</li>
 <li><strong>MetaSo (metaso.cn), using the MiniMax H3 video model,</strong> receives your photo and makes the video. Its own retention rules apply to the files it receives.</li>
 <li><strong>Stripe</strong> processes payments.</li>
 <li><strong>jsDelivr</strong> serves the video-processing component your browser downloads; it receives your IP address like any web request.</li></ul>

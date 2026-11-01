@@ -239,8 +239,16 @@ async function settleOrder(env, order, session, via) {
   const currency = String(session.currency || '').toLowerCase();
   const paymentStatus = session.payment_status;
 
+  if (paymentStatus !== 'paid') return { settled: false, reason: 'not_paid' };
+  // The session must be the one created for this order (same site, order, user and pack).
+  const m = session.metadata || {};
+  if (m.site !== SITE || (m.order_id || session.client_reference_id) !== order.id || m.user_id !== order.user_id ||
+      m.credits !== String(order.credits) || (order.session_id && session.id && session.id !== order.session_id)) {
+    await anomaly(env, 'session_mismatch', order.id, { session: session.id, meta_order: m.order_id || null, meta_site: m.site || null });
+    return { settled: false, reason: 'session_mismatch' };
+  }
   // Validate amount and currency
-  if (paymentStatus !== 'paid' || currency !== 'usd' || amountPaid === null || amountPaid < order.cents) {
+  if (currency !== 'usd' || amountPaid === null || amountPaid < order.cents) {
     await anomaly(env, 'amount_mismatch', order.id, {
       expected: order.cents,
       got: amountPaid,
@@ -347,7 +355,8 @@ async function stripeReturn(req, env) {
     const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
     if (!order) return Response.redirect('https://tinydesktrend.com/?paid=pending#create', 302);
     const result = await settleOrder(env, order, session, 'return');
-    return Response.redirect(`https://tinydesktrend.com/?paid=${result.settled ? '1' : 'pending'}#create`, 302);
+    const done = result.settled || result.reason === 'already_settled';
+    return Response.redirect(`https://tinydesktrend.com/?paid=${done ? '1' : 'pending'}#create`, 302);
   } catch (e) {
     console.error(JSON.stringify({ event: 'stripe_return_failed', msg: String(e?.message || e).slice(0, 200) }));
     return Response.redirect('https://tinydesktrend.com/?paid=pending#create', 302);
@@ -404,22 +413,22 @@ async function webhook(req, env) {
   
   if (ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded') {
     if (obj.payment_status !== 'paid') { await record.run(); return json({ received: true }); }
-    await record.run();
     await settleOrder(env, order, obj, 'webhook');
+    await record.run();
   } else if (ev.type === 'checkout.session.async_payment_failed') {
     await env.DB.batch([
       record,
       env.DB.prepare("UPDATE orders SET status='failed', updated_at=? WHERE id=? AND status='pending'").bind(t, order.id),
     ]);
   } else if (ev.type === 'charge.refunded') {
-    await record.run();
     await handleRefund(env, order, obj);
+    await record.run();
   } else if (ev.type === 'charge.dispute.created') {
-    await record.run();
     await handleDisputeCreated(env, order, obj);
-  } else if (ev.type === 'charge.dispute.closed') {
     await record.run();
+  } else if (ev.type === 'charge.dispute.closed') {
     await handleDisputeClosed(env, order, obj);
+    await record.run();
   } else if (ev.type === 'checkout.session.expired') {
     await env.DB.batch([record, env.DB.prepare("UPDATE orders SET status='expired', updated_at=? WHERE id=? AND status='pending'").bind(t, order.id)]);
   } else {
@@ -434,7 +443,7 @@ async function handleRefund(env, order, charge) {
   const amountPaid = order.amount_paid || charge.amount || 0;
   const newRefundDelta = amountRefunded - (order.refunded_cents || 0);
   
-  if (newRefundDelta <= 0) return; // No new refund
+  if (newRefundDelta <= 0 || amountPaid <= 0) return; // No new refund
   
   const isFullRefund = amountRefunded >= amountPaid;
   const newStatus = isFullRefund ? 'refunded' : 'partially_refunded';
@@ -451,7 +460,7 @@ async function handleRefund(env, order, charge) {
   const actualClaw = Math.min(toClaw, Math.max(0, currentBalance));
   
   const batch = [
-    env.DB.prepare("UPDATE orders SET status=?, refunded_cents=?, updated_at=? WHERE id=?").bind(newStatus, amountRefunded, t, order.id),
+    env.DB.prepare("UPDATE orders SET status=?, refunded_cents=?, updated_at=? WHERE id=? AND COALESCE(refunded_cents,0) < ?").bind(newStatus, amountRefunded, t, order.id, amountRefunded),
   ];
   
   if (actualClaw > 0) {
@@ -474,6 +483,7 @@ async function handleRefund(env, order, charge) {
 }
 
 async function handleDisputeCreated(env, order, dispute) {
+  if (order.status !== 'paid' && order.status !== 'partially_refunded') return; // already disputed/closed: replay
   const t = now();
   const currentBalance = await balance(env, order.user_id);
   const holdAmount = Math.min(order.credits, Math.max(0, currentBalance));
@@ -498,6 +508,7 @@ async function handleDisputeCreated(env, order, dispute) {
 }
 
 async function handleDisputeClosed(env, order, dispute) {
+  if (order.status !== 'disputed') return; // not open (or already closed): replay
   const t = now();
   const status = dispute.status;
   
@@ -547,7 +558,7 @@ async function reconcileOrders(env) {
       } else if (session.status === 'expired') {
         await env.DB.prepare("UPDATE orders SET status='expired', updated_at=? WHERE id=? AND status='pending'").bind(t, order.id).run();
       }
-      // If open, skip (will poll again later)
+      else await env.DB.prepare("UPDATE orders SET updated_at=? WHERE id=? AND status='pending'").bind(t, order.id).run(); // open: poll again in 5 min
     } catch (e) {
       console.error(JSON.stringify({ event: 'reconcile_poll_failed', order: order.id, msg: String(e?.message || e).slice(0, 200) }));
     }
@@ -776,10 +787,18 @@ async function admin(req, env, path) {
     const rows = await env.DB.prepare('SELECT event, COUNT(*) AS n FROM funnel_events GROUP BY event').all();
     return json(rows.results);
   }
-  if (path === '/api/admin/anomalies') {
-    const rows = await env.DB.prepare('SELECT * FROM payment_anomalies ORDER BY created_at DESC LIMIT 100').all();
+  if (path === '/api/admin/anomalies' && req.method === 'GET') {
+    // ?since=<unix seconds> (default 0) &limit=1..500 (default 100) &open=1 (only unresolved)
+    const q = new URL(req.url).searchParams;
+    const since = Math.max(0, parseInt(q.get('since') || '0', 10) || 0);
+    const limit = Math.min(500, Math.max(1, parseInt(q.get('limit') || '100', 10) || 100));
+    const onlyOpen = q.get('open') === '1';
+    const rows = await env.DB.prepare(
+      `SELECT id, order_id, kind, detail, resolved, created_at FROM payment_anomalies WHERE created_at >= ?${onlyOpen ? ' AND resolved = 0' : ''} ORDER BY created_at DESC, id DESC LIMIT ?`,
+    ).bind(since, limit).all();
     const open = await env.DB.prepare('SELECT COUNT(*) AS n FROM payment_anomalies WHERE resolved = 0').first();
-    return json({ open: open.n, anomalies: rows.results });
+    const anomalies = rows.results.map((r) => { let d = r.detail; try { d = JSON.parse(r.detail); } catch {} return { ...r, detail: d }; });
+    return json({ open: open.n, since, limit, count: anomalies.length, anomalies });
   }
   return err(404, 'Not found.');
 }
